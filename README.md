@@ -1,1 +1,0 @@
-# SECC_backend

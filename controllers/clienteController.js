@@ -3,12 +3,27 @@ const clienteModel = require('../models/clienteModel');
 async function getClientes(req, res) {
   console.log('Controlador: llegando a GET /clientes');
   try {
-    const clientes = await clienteModel.getAllClientes();
-    console.log('Controlador: enviando respuesta con', clientes.length, 'clientes');
-    res.status(200).json(clientes);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 9;
+    const search = req.query.search || "";
+
+    const resultado = await clienteModel.getAllClientes(
+      page,
+      limit,
+      search
+    );
+
+    console.log("URL:", req.originalUrl);
+    console.log("Query:", req.query);
+
+    res.status(200).json(resultado);
   } catch (error) {
     console.error('Controlador: error al obtener clientes', error);
-    res.status(500).json({ message: 'Error al obtener los clientes', error: error.message });
+    res.status(500).json(
+      { message: 'Error al obtener los clientes',
+        error: error.message,
+      }
+    );
   }
 }
 

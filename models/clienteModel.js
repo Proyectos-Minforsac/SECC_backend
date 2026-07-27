@@ -9,7 +9,7 @@ async function getAllClientes(page, limit, search) {
     SELECT *
     FROM "clientes"
     WHERE nombre ILIKE '%' || $3 || '%'
-    ORDER BY cliente_id ASC
+    ORDER BY cliente_id DESC
     LIMIT $1 OFFSET $2
   `, [limit, offset, search]);
 
@@ -28,20 +28,20 @@ async function getAllClientes(page, limit, search) {
   };
 }
 
-async function createCliente({ nombre, direccion, correo_electronico, tipo_persona }) {
+async function createCliente({ nombre, direccion, correo_electronico, tipo_persona, ruc }) {
   console.log('Modelo: creando cliente:', { nombre, direccion, correo_electronico, tipo_persona });
   const result = await db.query(
     `INSERT INTO "clientes" (nombre, direccion, correo_electronico, tipo_persona, ruc)
      VALUES ($1, $2, $3, $4, $5)
      RETURNING cliente_id, nombre, direccion, correo_electronico, tipo_persona, ruc`,
-    [nombre, direccion, correo_electronico, tipo_persona]
+    [nombre, direccion, correo_electronico, tipo_persona, ruc]
   );
 
   console.log('Modelo: cliente creado:', result.rows[0]);
   return result.rows[0];
 }
 
-async function updateCliente(cliente_id, { nombre, direccion, correo_electronico, tipo_persona }) {
+async function updateCliente(cliente_id, { nombre, direccion, correo_electronico, tipo_persona, ruc }) {
   console.log('Modelo: actualizando cliente', cliente_id);
 
   const result = await db.query(
@@ -53,9 +53,10 @@ async function updateCliente(cliente_id, { nombre, direccion, correo_electronico
          ruc = $5
      WHERE cliente_id = $6
      RETURNING cliente_id, nombre, direccion, correo_electronico, tipo_persona, ruc`,
-    [nombre, direccion, correo_electronico, tipo_persona, cliente_id]
+    [nombre, direccion, correo_electronico, tipo_persona, ruc, cliente_id]
   );
 
+  console.log('Modelo: cliente actualizado:', result.rows[0]);
   return result.rows[0];
 }
 
@@ -69,6 +70,7 @@ async function deleteCliente(cliente_id) {
     [cliente_id]
   );
 
+  console.log('Modelo: cliente eliminado:', result.rows[0]);
   return result.rows[0];
 }
 

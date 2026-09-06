@@ -1,84 +1,201 @@
-const db = require('../config/database');
+const { conectar } = require('../services/sheetsService');
+const { v4: uuidv4 } = require('uuid');
 
 async function getAllTecnicos(page, limit, search) {
-  // console.log('Modelo: solicitando todos los técnicos');
+  const doc = await conectar();
+  const hojaTecnicos = doc.sheetsByTitle['tecnicos'];
+  const hojaPrecios = doc.sheetsByTitle['preciosAire'];
 
+  const [filasTecnicos, filasPrecios] = await Promise.all([
+    hojaTecnicos.getRows(),
+    hojaPrecios.getRows(),
+  ]);
+
+  const tecnicos = filasTecnicos
+                    .map(f => f.toObject())
+                    .sort((a, b) => b.tecnicoId - a.tecnicoId);
+  const precios = filasPrecios.map(f => ({
+    ...f.toObject(),
+    precio: Number(f.get('precio')),
+  }));
+
+  const preciosPorTecnico = precios.reduce((acc, p) => {
+    if (!acc[p.tecnicoId]) acc[p.tecnicoId] = [];
+    acc[p.tecnicoId].push(p);
+    return acc;
+  }, {});
+
+  const busqueda = (search || '').trim().toLowerCase();
+  const filtrados = busqueda
+    ? tecnicos.filter(c => (c.nombre || '').toLowerCase().includes(busqueda))
+    : tecnicos;
+
+  const total = filtrados.length;
   const offset = (page - 1) * limit;
+  const paginados = filtrados.slice(offset, offset + limit);
 
-  const tecnicos = await db.query(
-    `
-    SELECT
-      t.*,
-      COALESCE(
-        json_agg(
-          json_build_object(
-            'precio_aire_id', pa.precio_aire_id,
-            'tipo_aire', pa.tipo_aire,
-            'precio', pa.precio
-          )
-          ORDER BY pa.tipo_aire
-        ) FILTER (WHERE pa.precio_aire_id IS NOT NULL),
-        '[]'
-      ) AS precios
-    FROM "tecnicos" t
-    LEFT JOIN "precios_aire" pa
-      ON t.tecnico_id = pa.tecnico_id
-    WHERE t.nombre ILIKE '%' || $3 || '%'
-    GROUP BY t.tecnico_id
-    ORDER BY t.tecnico_id ASC
-    LIMIT $1 OFFSET $2
-  `, [limit, offset, search]);
-
-  console.log(JSON.stringify(tecnicos.rows, null, 2))
-
-  const total = await db.query(`
-    SELECT COUNT(*) AS total
-    FROM "tecnicos"
-    WHERE nombre ILIKE '%' || $1 || '%'
-  `, [search]);
-
-  const tecnicosConPrecios = tecnicos.rows.map((tecnico) => ({
-    ...tecnico,
-    precios: typeof tecnico.precios === 'string' ? JSON.parse(tecnico.precios) : tecnico.precios,
+  const tecnicosConPrecios = paginados.map(t => ({
+    ...t,
+    precios: (preciosPorTecnico[t.tecnicoId] || []).sort((a, b) => (a.tipoAire || '').localeCompare(b.tipoAire || '')
+    ),
   }));
 
   return {
     tecnicos: tecnicosConPrecios,
-    total: Number(total.rows[0].total),
+    total,
     page,
     limit,
-    totalPages: Math.ceil(total.rows[0].total / limit)
-  };
+    totalPages: Math.ceil(total / limit) || 1,
+  }
 }
 
-async function createTecnico({ nombre, tipo_documento, numero_documento, telefono, ubicacion, servicio, area, calificacion }) {
+async function createTecnico({ nombre, tipoDocumento, numeroDocumento, telefono, ubicacion, servicio, area, calificacion, precios = [] }) {
   console.log('Modelo: creando técnico: ', {
-    nombre, tipo_documento, numero_documento, telefono, ubicacion, servicio, area, calificacion
+    nombre, tipoDocumento, numeroDocumento, telefono, ubicacion, servicio, area, calificacion, precios
   });
 
-  const result = await db.query(
+  const doc = await conectar();
+  const hojaTecnicos = doc.sheetsByTitle['tecnicos'];
+  const hojaPrecios = doc.sheetsByTitle['preciosAire'];
 
-  )
+  const [filasTecnicos, filasPrecios] = await Promise.all([
+    hojaTecnicos.getRows(),
+    hojaPrecios.getRows(),
+  ]);
+
+  const idsTecnicos = filasTecnicos
+    .map(f => parseInt(f.get('tecnicoId'), 10))
+    .filter(n => Number.isInteger(n));
+  const tecnicoId = (idsTecnicos.length ? Math.max(...idsTecnicos) : 0) + 1;
+
+  const idsPrecios = filasPrecios
+    .map(f => parseInt(f.get('precioAireId'), 10))
+    .filter(n => Number.isInteger(n));
+  let siguientePrecioId = (idsPrecios.length ? Math.max(...idsPrecios) : 0) + 1;
+
+  const nuevaFilaTecnico = await hojaTecnicos.addRow({
+    tecnicoId,
+    nombre,
+    tipoDocumento,
+    numeroDocumento,
+    telefono,
+    ubicacion,
+    servicio,
+    area,
+    calificacion,
+  });
+
+  const preciosCreados = [];
+  for (const { tipoAire, precio } of precios) {
+    const precioAireId = siguientePrecioId++;
+    await hojaPrecios.addRow({
+      precioAireId,
+      tecnicoId,
+      tipoAire,
+      precio,
+    });
+    preciosCreados.push({ precioAireId, tecnicoId, tipoAire, precio: Number(precio) });
+  }
+
+  const tecnicoCreado = {
+    ...nuevaFilaTecnico.toObject(),
+    precios: preciosCreados,
+  };
+  console.log('Técnico creado: ', tecnicoCreado);
+  return tecnicoCreado;
 }
 
-async function updateTecnico(tecnico_id, {
-  nombre, tipo_documento, numero_documento, telefono, ubicacion, servicio, area, calificacion }) {
-  console.log('Modelo: actualizando técnico', tecnico_id);
+async function updateTecnico(tecnicoId, {
+  nombre, tipoDocumento, numeroDocumento, telefono, ubicacion, servicio, area, calificacion, precios = [] }) {
+  console.log('Modelo actualizando técnico', tecnicoId);
 
-  const result = await db.query(
+  const doc = await conectar();
+  const hojaTecnicos = doc.sheetsByTitle['tecnicos'];
+  const hojaPrecios = doc.sheetsByTitle['preciosAire'];
 
-  );
+  const [filasTecnicos, filasPrecios] = await Promise.all([
+    hojaTecnicos.getRows(),
+    hojaPrecios.getRows(),
+  ]);
+
+  const fila = filasTecnicos.find(f => String(f.get('tecnicoId')) === String(tecnicoId));
+
+  if (!fila) {
+    console.log('Modelo: Técnico no encontrado', tecnicoId);
+    return null;
+  }
+
+  fila.set('nombre', nombre);
+  fila.set('tipoDocumento', tipoDocumento);
+  fila.set('numeroDocumento', numeroDocumento);
+  fila.set('telefono', telefono);
+  fila.set('ubicacion', ubicacion);
+  fila.set('servicio', servicio);
+  fila.set('area', area);
+  fila.set('calificacion', calificacion);
+
+  await fila.save();
+
+  // Se rehacen los precios de aire: se borran los actuales y se reinsertan los nuevos (>0).
+  const filasPreciosTecnico = filasPrecios
+    .filter(f => String(f.get('tecnicoId')) === String(tecnicoId))
+    .sort((a, b) => b.rowNumber - a.rowNumber);
+  for (const f of filasPreciosTecnico) {
+    await f.delete();
+  }
+
+  const idsPrecios = filasPrecios
+    .map(f => parseInt(f.get('precioAireId'), 10))
+    .filter(n => Number.isInteger(n));
+  let siguientePrecioId = (idsPrecios.length ? Math.max(...idsPrecios) : 0) + 1;
+
+  const preciosActualizados = [];
+  for (const { tipoAire, precio } of precios) {
+    const precioAireId = siguientePrecioId++;
+    await hojaPrecios.addRow({ precioAireId, tecnicoId, tipoAire, precio });
+    preciosActualizados.push({ precioAireId, tecnicoId, tipoAire, precio: Number(precio) });
+  }
+
+  const tecnicoActualizado = {
+    ...fila.toObject(),
+    precios: preciosActualizados,
+  };
+  console.log('Técnico actualizado', tecnicoActualizado);
+  return tecnicoActualizado;
 }
 
-async function deleteTecnico(tecnico_id) {
-  console.log('Modelo: eliminando técnico', tecnico_id);
+async function deleteTecnico(tecnicoId) {
+  console.log('Modelo: eliminando técnico', tecnicoId);
 
-  const result = await db.query(
+  const doc = await conectar();
+  const hojaTecnicos = doc.sheetsByTitle['tecnicos'];
+  const hojaPrecios = doc.sheetsByTitle['preciosAire'];
 
-  );
+  const [filasTecnicos, filasPrecios] = await Promise.all([
+    hojaTecnicos.getRows(),
+    hojaPrecios.getRows(),
+  ]);
 
-  console.log('Modelo: cliente eliminado:', result.rows[0]);
-  return result.rows[0];
+  const fila = filasTecnicos.find(f => String(f.get('tecnicoId')) === String(tecnicoId));
+
+  if (!fila) {
+    console.log('Modelo: Técnico no encontrado', tecnicoId);
+    return null;
+  }
+
+  // Se eliminan en cascada los precios de aire del técnico (de abajo hacia arriba
+  // para que no se corran los índices de fila).
+  const filasPreciosTecnico = filasPrecios
+    .filter(f => String(f.get('tecnicoId')) === String(tecnicoId))
+    .sort((a, b) => b.rowNumber - a.rowNumber);
+  for (const f of filasPreciosTecnico) {
+    await f.delete();
+  }
+
+  await fila.delete();
+
+  console.log('Técnico eliminado', tecnicoId);
+  return { tecnicoId };
 }
 
 module.exports = {

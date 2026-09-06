@@ -7,13 +7,9 @@ async function getClientes(req, res) {
     const limit = parseInt(req.query.limit) || 9;
     const search = req.query.search || "";
 
-    const resultado = await clienteModel.getAllClientes(
-      page,
-      limit,
-      search
-    );
-
+    const resultado = await clienteModel.getAllClientes(page, limit, search);
     res.status(200).json(resultado);
+
   } catch (error) {
     console.error('Controlador: error al obtener clientes', error);
     res.status(500).json(
@@ -29,43 +25,24 @@ async function createCliente(req, res) {
   console.log('Controlador: llegando a POST /clientes');
   console.log('Body recibido:', req.body);
   try {
-    const { nombre, direccion, ruc, correo_electronico, tipo_persona } = req.body;
+    const { nombre, direccion, ruc, correoElectronico, tipoPersona } = req.body;
 
-    if (!nombre || !direccion || !ruc || !correo_electronico || !tipo_persona) {
+    if (!nombre || !direccion || !ruc || !correoElectronico || !tipoPersona) {
       console.log('Controlador: faltan campos en la petición');
       return res.status(400).json({ message: 'Todos los campos son obligatorios' });
     }
 
-    if (nombre.length > 256) {
-      return res.status(400).json({
-        message: "El nombre excede el tamaño permitido"
-      });
-    }
-
-    if (direccion.length > 512) {
-      return res.status(400).json({
-        message: "La dirección excede el tamaño permitido"
-      });
-    }
-
-    if (ruc.length != 11) {
-      return res.status(400).json({
-        message: "El R.U.C no tiene la cantidad requerida"
-      });
-    }
-
-    if (correo_electronico.length > 256) {
-      return res.status(400).json({
-        message: "El correo electrónico excede el tamaño permitido"
-      });
-    }
-
+    if (nombre.length > 256) return res.status(400).json({message: "El nombre excede el tamaño permitido"});
+    if (direccion.length > 512) return res.status(400).json({message: "La dirección excede el tamaño permitido"});
+    if (ruc.length != 11) return res.status(400).json({message: "El RUC no tiene la cantidad requerida"});
+    if (correoElectronico.length > 256) return res.status(400).json({message: "El correo electrónico excede el tamaño permitido"});
+  
     const nuevoCliente = await clienteModel.createCliente({
       nombre,
       direccion,
       ruc,
-      correo_electronico,
-      tipo_persona,
+      correoElectronico,
+      tipoPersona,
     });
 
     console.log('Controlador: cliente creado correctamente');
@@ -76,14 +53,15 @@ async function createCliente(req, res) {
   }
 }
 
+
 async function updateCliente(req, res) {
   console.log('Controlador: PUT /clientes');
 
   try {
     const { id } = req.params;
-    const { nombre, direccion, ruc, correo_electronico, tipo_persona } = req.body;
+    const { nombre, direccion, ruc, correoElectronico, tipoPersona } = req.body;
 
-    if (!nombre || !direccion || !ruc || !correo_electronico || !tipo_persona) {
+    if (!nombre || !direccion || !ruc || !correoElectronico || !tipoPersona) {
       return res.status(400).json({
         message: 'Todos los campos son obligatorios'
       });
@@ -93,8 +71,8 @@ async function updateCliente(req, res) {
       nombre,
       direccion,
       ruc,
-      correo_electronico,
-      tipo_persona
+      correoElectronico,
+      tipoPersona
     });
 
     if (!clienteActualizado) {

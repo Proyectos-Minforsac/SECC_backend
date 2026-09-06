@@ -1,77 +1,102 @@
-const db = require('../config/database');
+const { conectar } = require('../services/sheetsService');
 
 async function getAllClientes(page, limit, search) {
-  console.log('Modelo: solicitando todos los clientes');
+  const doc = await conectar();
+  const hoja = doc.sheetsByTitle['clientes'];
+  const filas = await hoja.getRows();
+  const clientes = filas
+                    .map(f => f.toObject())
+                    .sort((a, b) => b.clienteId - a.clienteId);
 
+  const busqueda = (search || '').trim().toLowerCase();
+  const filtrados = busqueda
+    ? clientes.filter(c => (c.nombre || '').toLowerCase().includes(busqueda))
+    : clientes;
+
+  const total = filtrados.length;
   const offset = (page - 1) * limit;
-
-  const clientes = await db.query(`
-    SELECT *
-    FROM "clientes"
-    WHERE nombre ILIKE '%' || $3 || '%'
-    ORDER BY cliente_id DESC
-    LIMIT $1 OFFSET $2
-  `, [limit, offset, search]);
-
-  const total = await db.query(`
-    SELECT COUNT(*) AS total
-    FROM "clientes"
-    WHERE nombre ILIKE '%' || $1 || '%'
-  `, [search]);
+  const paginados = filtrados.slice(offset, offset + limit);
 
   return {
-    clientes: clientes.rows,
-    total: Number(total.rows[0].total),
+    clientes: paginados,
+    total,
     page,
     limit,
-    totalPages: Math.ceil(total.rows[0].total / limit)
+    totalPages: Math.ceil(total / limit) || 1,
   };
 }
 
-async function createCliente({ nombre, direccion, correo_electronico, tipo_persona, ruc }) {
-  console.log('Modelo: creando cliente:', { nombre, direccion, correo_electronico, tipo_persona });
-  const result = await db.query(
-    `INSERT INTO "clientes" (nombre, direccion, correo_electronico, tipo_persona, ruc)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING cliente_id, nombre, direccion, correo_electronico, tipo_persona, ruc`,
-    [nombre, direccion, correo_electronico, tipo_persona, ruc]
-  );
+async function createCliente({ nombre, direccion, correoElectronico, tipoPersona, ruc }) {
+  console.log('Modelo creando cliente:', { nombre, direccion, correoElectronico, tipoPersona, ruc });
 
-  console.log('Modelo: cliente creado:', result.rows[0]);
-  return result.rows[0];
+  const doc = await conectar();
+  const hoja = doc.sheetsByTitle['clientes'];
+
+  const filas = await hoja.getRows();
+  const ids = filas
+    .map(f => parseInt(f.get('clienteId'), 10))
+    .filter(n => Number.isInteger(n));
+  const clienteId = (ids.length ? Math.max(...ids) : 0) + 1;
+
+  const nuevaFila = await hoja.addRow({
+    clienteId,
+    nombre,
+    direccion,
+    correoElectronico,
+    tipoPersona,
+    ruc,
+  });
+
+  const clienteCreado = nuevaFila.toObject();
+  console.log('Cliente creado: ', clienteCreado)
+  return clienteCreado;
 }
 
-async function updateCliente(cliente_id, { nombre, direccion, correo_electronico, tipo_persona, ruc }) {
-  console.log('Modelo: actualizando cliente', cliente_id);
+async function updateCliente(clienteId, {nombre, direccion, correoElectronico, tipoPersona, ruc}) {
+  console.log('Modelo actualizando cliente', clienteId);
 
-  const result = await db.query(
-    `UPDATE "clientes"
-     SET nombre = $1,
-         direccion = $2,
-         correo_electronico = $3,
-         tipo_persona = $4,
-         ruc = $5
-     WHERE cliente_id = $6
-     RETURNING cliente_id, nombre, direccion, correo_electronico, tipo_persona, ruc`,
-    [nombre, direccion, correo_electronico, tipo_persona, ruc, cliente_id]
-  );
+  const doc = await conectar();
+  const hoja = doc.sheetsByTitle['clientes'];
 
-  console.log('Modelo: cliente actualizado:', result.rows[0]);
-  return result.rows[0];
+  const filas = await hoja.getRows();
+  const fila = filas.find(f => f.get('clienteId') === clienteId);
+
+  if (!fila) {
+    console.log('Modelo: Cliente no encontrado', clienteId);
+    return null;
+  }
+
+  fila.set('nombre', nombre);
+  fila.set('direccion', direccion);
+  fila.set('correoElectronico', correoElectronico);
+  fila.set('tipoPersona', tipoPersona);
+  fila.set('ruc', ruc);
+
+  await fila.save();
+
+  const clienteActualizado = fila.toObject();
+  console.log('Cliente actualizado', clienteActualizado);
+  return clienteActualizado;
 }
 
-async function deleteCliente(cliente_id) {
-  console.log('Modelo: eliminando cliente', cliente_id);
+async function deleteCliente(clienteId) {
+  console.log('Eliminando cliente', clienteId);
+  
+  const doc = await conectar();
+  const hoja = doc.sheetsByTitle['clientes'];
 
-  const result = await db.query(
-    `DELETE FROM "clientes"
-     WHERE cliente_id = $1
-     RETURNING cliente_id`,
-    [cliente_id]
-  );
+  const filas = await hoja.getRows();
+  const fila = filas.find(f => f.get('clienteId') === clienteId);
 
-  console.log('Modelo: cliente eliminado:', result.rows[0]);
-  return result.rows[0];
+  if (!fila) {
+    console.log('Modelo: Cliente no encontrado', clienteId);
+    return null;
+  }
+  
+  await fila.delete();
+
+  console.log('Cliente eliminado', clienteId);
+  return { clienteId };
 }
 
 module.exports = {

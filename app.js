@@ -1,6 +1,7 @@
 const express = require('express');
 const clienteRoutes = require('./routes/clienteRoutes');
 const tecnicoRoutes = require('./routes/tecnicoRoutes');
+const itemRoutes = require('./routes/itemRoutes');
 const cors = require('cors');
 require('dotenv').config();
 
@@ -19,6 +20,7 @@ console.log('Puerto configurado:', PORT);
 app.use(express.json());
 app.use('/api', clienteRoutes);
 app.use('/api', tecnicoRoutes);
+app.use('/api', itemRoutes);
 
 app.get('/', (req, res) => {
   console.log('GET / recibido');

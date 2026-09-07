@@ -48,7 +48,7 @@ async function createCliente({ nombre, direccion, correoElectronico, tipoPersona
   });
 
   const clienteCreado = nuevaFila.toObject();
-  console.log('Cliente creado: ', clienteCreado)
+  console.log('Cliente creado: ', clienteCreado);
   return clienteCreado;
 }
 

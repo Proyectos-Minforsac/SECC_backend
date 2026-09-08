@@ -11,8 +11,8 @@ async function getAllTecnicos(page, limit, search) {
   ]);
 
   const tecnicos = filasTecnicos
-                    .map(f => f.toObject())
-                    .sort((a, b) => b.tecnicoId - a.tecnicoId);
+    .map(f => f.toObject())
+    .sort((a, b) => b.tecnicoId - a.tecnicoId);
   const precios = filasPrecios.map(f => ({
     ...f.toObject(),
     precio: Number(f.get('precio')),
@@ -38,6 +38,10 @@ async function getAllTecnicos(page, limit, search) {
     precios: (preciosPorTecnico[t.tecnicoId] || []).sort((a, b) => (a.tipoAire || '').localeCompare(b.tipoAire || '')
     ),
   }));
+
+  console.log('fila precio ejemplo:', filasPrecios[0]?.toObject());
+  console.log('claves agrupadas:', Object.keys(preciosPorTecnico));
+  console.log('tecnicoIds pagina:', paginados.map(t => t.tecnicoId));
 
   return {
     tecnicos: tecnicosConPrecios,

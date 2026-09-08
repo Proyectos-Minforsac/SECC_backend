@@ -3,7 +3,7 @@ const tecnicoModel = require('../models/tecnicoModel');
 // Valida y normaliza los precios de aire. Devuelve { error } o { precios }.
 // Un precio en 0 no se registra: solo se conservan los mayores a 0.
 function normalizarPreciosAire(servicio, precios) {
-  if (servicio !== 'Aire condicionado') {
+  if (servicio !== 'Aire Condicionado') {
     return { precios: [] };
   }
 

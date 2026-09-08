@@ -2,6 +2,7 @@ const express = require('express');
 const clienteRoutes = require('./routes/clienteRoutes');
 const tecnicoRoutes = require('./routes/tecnicoRoutes');
 const itemRoutes = require('./routes/itemRoutes');
+const cotizacionRoutes = require('./routes/cotizacionRoutes');
 const cors = require('cors');
 require('dotenv').config();
 
@@ -21,6 +22,7 @@ app.use(express.json());
 app.use('/api', clienteRoutes);
 app.use('/api', tecnicoRoutes);
 app.use('/api', itemRoutes);
+app.use('/api', cotizacionRoutes);
 
 app.get('/', (req, res) => {
   console.log('GET / recibido');

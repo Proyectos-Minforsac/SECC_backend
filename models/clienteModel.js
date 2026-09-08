@@ -26,6 +26,15 @@ async function getAllClientes(page, limit, search) {
   };
 }
 
+async function getClienteById(clienteId) {
+  const doc = await conectar();
+  const hoja = doc.sheetsByTitle['clientes'];
+  const filas = await hoja.getRows();
+  const fila = filas.find(f => f.get('clienteId') === clienteId);
+
+  return fila ? fila.toObject() : null;
+}
+
 async function createCliente({ nombre, direccion, correoElectronico, tipoPersona, ruc }) {
   console.log('Modelo creando cliente:', { nombre, direccion, correoElectronico, tipoPersona, ruc });
 
@@ -101,6 +110,7 @@ async function deleteCliente(clienteId) {
 
 module.exports = {
   getAllClientes,
+  getClienteById,
   createCliente,
   updateCliente,
   deleteCliente,

@@ -1,6 +1,6 @@
 const { conectar } = require('../services/sheetsService');
 
-async function getAllTecnicos(page, limit, search) {
+async function getAllTecnicos(page, limit, search, ubicacion) {
   const doc = await conectar();
   const hojaTecnicos = doc.sheetsByTitle['tecnicos'];
   const hojaPrecios = doc.sheetsByTitle['preciosAire'];
@@ -25,9 +25,11 @@ async function getAllTecnicos(page, limit, search) {
   }, {});
 
   const busqueda = (search || '').trim().toLowerCase();
-  const filtrados = busqueda
-    ? tecnicos.filter(c => (c.nombre || '').toLowerCase().includes(busqueda))
-    : tecnicos;
+  const ubicacionFiltro = (ubicacion || '').trim().toLowerCase();
+
+  const filtrados = tecnicos
+    .filter(c => !busqueda || (c.nombre || '').toLowerCase().includes(busqueda))
+    .filter(c => !ubicacionFiltro || (c.ubicacion || '').toLowerCase() === ubicacionFiltro);
 
   const total = filtrados.length;
   const offset = (page - 1) * limit;

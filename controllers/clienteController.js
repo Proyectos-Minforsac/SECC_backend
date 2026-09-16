@@ -6,8 +6,9 @@ async function getClientes(req, res) {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 9;
     const search = req.query.search || "";
+    const tipoPersona = req.query.tipoPersona || "";
 
-    const resultado = await clienteModel.getAllClientes(page, limit, search);
+    const resultado = await clienteModel.getAllClientes(page, limit, search, tipoPersona);
     res.status(200).json(resultado);
 
   } catch (error) {

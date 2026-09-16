@@ -1,6 +1,6 @@
 const { conectar } = require('../services/sheetsService');
 
-async function getAllClientes(page, limit, search) {
+async function getAllClientes(page, limit, search, tipoPersona) {
   const doc = await conectar();
   const hoja = doc.sheetsByTitle['clientes'];
   const filas = await hoja.getRows();
@@ -9,9 +9,11 @@ async function getAllClientes(page, limit, search) {
                     .sort((a, b) => b.clienteId - a.clienteId);
 
   const busqueda = (search || '').trim().toLowerCase();
-  const filtrados = busqueda
-    ? clientes.filter(c => (c.nombre || '').toLowerCase().includes(busqueda))
-    : clientes;
+  const tipo = (tipoPersona || '').trim().toLowerCase();
+
+  const filtrados = clientes
+    .filter(c => !busqueda || (c.nombre || '').toLowerCase().includes(busqueda))
+    .filter(c => !tipo || (c.tipoPersona || '').toLowerCase() === tipo);
 
   const total = filtrados.length;
   const offset = (page - 1) * limit;

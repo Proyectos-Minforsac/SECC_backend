@@ -7,6 +7,7 @@ const conformidadRoutes = require('./routes/conformidadRoutes');
 const driveRoutes = require('./routes/driveRoutes');
 const authRoutes = require('./routes/authRoutes');
 const solicitudRoutes = require('./routes/solicitudRoutes');
+const visitaRoutes = require('./routes/visitaRoutes');
 const cors = require('cors');
 require('dotenv').config();
 
@@ -32,6 +33,7 @@ app.use('/api', conformidadRoutes);
 app.use('/api', driveRoutes);
 app.use('/api', authRoutes);
 app.use('/api', solicitudRoutes);
+app.use('/api', visitaRoutes);
 
 app.get('/', (req, res) => {
   console.log('GET / recibido');

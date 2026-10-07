@@ -1,5 +1,16 @@
 const { conectar } = require('../services/sheetsService');
 const driveService = require('../services/driveService');
+const visitaModel = require('./visitaModel');
+const {
+  errorHttp,
+  texto,
+  mismoId,
+  normalizar,
+  aISO,
+  aDiaMesAnio,
+  hoyISO,
+  siguienteId,
+} = require('../services/hojasUtils');
 
 const ESTADOS_QUE_ADMITEN_OFERTAS = ['PENDIENTE', 'CON OFERTAS'];
 
@@ -8,41 +19,6 @@ const ESTADOS_QUE_ADMITEN_OFERTAS = ['PENDIENTE', 'CON OFERTAS'];
 //   Clientes/<Cliente>/Servicio N° X - <fecha>/         todo el servicio; la oferta aceptada se mueve aquí
 const CARPETA_SOLICITUDES = 'Solicitudes de Servicio';
 const CARPETA_CLIENTES = 'Clientes';
-
-// Error con código HTTP; el controlador lo traduce a la respuesta.
-function errorHttp(status, message) {
-  const error = new Error(message);
-  error.status = status;
-  return error;
-}
-
-const texto = valor => String(valor ?? '').trim();
-const mismoId = (a, b) => texto(a) === texto(b);
-const normalizar = valor => texto(valor).toLowerCase();
-
-// En la hoja las fechas son "YYYY-MM-DD"; si alguien las edita a mano en Excel
-// pueden venir como "d/m/yyyy". Ambas se aceptan y se devuelven en el formato pedido.
-function partesFecha(valor) {
-  const fecha = texto(valor);
-  let m = fecha.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (m) return { anio: m[1], mes: m[2].padStart(2, '0'), dia: m[3].padStart(2, '0') };
-  m = fecha.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m) return { anio: m[3], mes: m[2].padStart(2, '0'), dia: m[1].padStart(2, '0') };
-  return null;
-}
-
-const aISO = valor => {
-  const p = partesFecha(valor);
-  return p ? `${p.anio}-${p.mes}-${p.dia}` : texto(valor);
-};
-
-const aDiaMesAnio = valor => {
-  const p = partesFecha(valor);
-  return p ? `${p.dia}/${p.mes}/${p.anio}` : texto(valor);
-};
-
-// Fecha de hoy en Perú, "YYYY-MM-DD".
-const hoyISO = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
 
 const sinSeparadores = nombre => texto(nombre).replace(/[\\/]+/g, '-');
 
@@ -64,11 +40,6 @@ const rutaCarpetaOfertas = (filaSolicitud, filaCliente) => [
 ];
 
 const idArchivoDrive = enlace => texto(enlace).match(/\/d\/([A-Za-z0-9_-]+)/)?.[1];
-
-function siguienteId(filas, campo) {
-  const ids = filas.map(f => parseInt(f.get(campo), 10)).filter(Number.isInteger);
-  return (ids.length ? Math.max(...ids) : 0) + 1;
-}
 
 async function cargarDatos() {
   const doc = await conectar();
@@ -434,6 +405,10 @@ async function autorizarViaje(solicitudId, { instrucciones, fechaInicio, fechaFi
   if (texto(filaSolicitud.get('estado')) !== 'ASIGNADA') {
     throw errorHttp(409, 'Solo se puede autorizar el viaje de una solicitud asignada');
   }
+
+  // La visita técnica se crea antes de marcar la solicitud como autorizada: si algo falla a la mitad,
+  // la solicitud sigue asignada y se puede reintentar (crearVisitaDeSolicitud reutiliza la visita ya creada).
+  await visitaModel.crearVisitaDeSolicitud(solicitudId);
 
   filaSolicitud.set('instrucciones', instrucciones);
   filaSolicitud.set('fechaInicio', fechaInicio);

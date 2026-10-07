@@ -6,7 +6,8 @@
     "start": "node app.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon app.js",
-    "drive:token": "node scripts/obtenerTokenDrive.js"
+    "drive:token": "node scripts/obtenerTokenDrive.js",
+    "visitas:pendientes": "node scripts/crearVisitasPendientes.js"
   },
   "keywords": [],
   "author": "",

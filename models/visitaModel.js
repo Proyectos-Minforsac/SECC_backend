@@ -15,6 +15,10 @@ const ESTADO_AUTORIZADA = 'AUTORIZADA';
 const ESTADO_DIAGNOSTICO = 'DIAGNÓSTICO COMPLETADO';
 const ESTADO_ACTIVO = 'ACTIVO';
 
+// Etapas posteriores al diagnóstico, en el orden en que se habilitan. Cada visita programada pertenece a una.
+// La etapa en curso es TIPOS_VISITA[etapasFinalizadas]: el empleado finaliza una etapa para habilitar la siguiente.
+const TIPOS_VISITA = ['INSTALACION', 'MANTENIMIENTO', 'SOPORTE'];
+
 const SEPARADOR_COMPONENTES = ';';
 
 // "9:30" -> "09:30"
@@ -49,6 +53,12 @@ async function cargarDatos() {
   return { hojas, filas: { visitas, programadas, solicitudes, ofertas, clientes, tecnicos } };
 }
 
+// Etapas posteriores al diagnóstico que el empleado ya finalizó (0 si la columna está vacía).
+const etapasFinalizadas = filaVisita => Number(texto(filaVisita.get('etapasFinalizadas'))) || 0;
+
+// Las visitas programadas anteriores a la columna "tipo" eran todas de instalación.
+const tipoDe = fila => texto(fila.get('tipo')) || TIPOS_VISITA[0];
+
 // Une las hojas y devuelve las visitas con la forma que consume el frontend. El cliente, las
 // instrucciones y la fecha no se duplican en visitasTecnicas: salen de la solicitud.
 function armarVisitas({ filas }, soloId) {
@@ -72,6 +82,7 @@ function armarVisitas({ filas }, soloId) {
         descripcion: texto(solicitud?.get('instrucciones')),
         fecha: aDiaMesAnio(solicitud?.get('fechaInicio')),
         estado: texto(f.get('estado')) || ESTADO_AUTORIZADA,
+        etapasFinalizadas: etapasFinalizadas(f),
       };
 
       if (texto(f.get('diagnosticoEn'))) {
@@ -102,6 +113,7 @@ function armarProgramada(fila) {
   const programada = {
     visitaProgramadaId: Number(texto(fila.get('visitaProgramadaId'))),
     visitaId: Number(texto(fila.get('visitaId'))),
+    tipo: tipoDe(fila),
     fecha: aISO(fila.get('fecha')),
     horaInicio: aHora(fila.get('horaInicio')),
     horaFin: aHora(fila.get('horaFin')),
@@ -233,17 +245,28 @@ async function registrarCierre(visitaId, carpetaUrl) {
   return armarVisitas(datos, visitaId)[0];
 }
 
-async function crearProgramada(visitaId, { fecha, horaInicio, horaFin, descripcionTareas }) {
+// Se puede programar en la etapa en curso o en las siguientes (el técnico las verá bloqueadas hasta que
+// se finalicen las anteriores), pero no en una etapa ya finalizada.
+async function crearProgramada(visitaId, { tipo, fecha, horaInicio, horaFin, descripcionTareas }) {
   console.log('Modelo: programando una visita del servicio', visitaId);
 
   const datos = await cargarDatos();
   const { hojas, filas } = datos;
-  exigirServicioAbierto(buscarVisita(datos, visitaId));
+  const filaVisita = buscarVisita(datos, visitaId);
+  exigirServicioAbierto(filaVisita);
+
+  if (texto(filaVisita.get('estado')) !== ESTADO_ACTIVO) {
+    throw errorHttp(409, 'El servicio todavía no está activo');
+  }
+  if (TIPOS_VISITA.indexOf(tipo) < etapasFinalizadas(filaVisita)) {
+    throw errorHttp(409, 'La etapa ya fue finalizada y no admite más visitas');
+  }
 
   const visitaProgramadaId = siguienteId(filas.programadas, 'visitaProgramadaId');
   const nueva = await hojas.programadas.addRow({
     visitaProgramadaId,
     visitaId,
+    tipo,
     fecha,
     horaInicio,
     horaFin,
@@ -286,8 +309,8 @@ async function eliminarProgramada(visitaProgramadaId) {
   return { visitaProgramadaId: Number(visitaProgramadaId) };
 }
 
-// El técnico deja su avance. Solo cuando el servicio está activo y únicamente en la visita "del momento":
-// la primera, en orden cronológico, que aún no completó.
+// El técnico deja su avance. Solo cuando el servicio está activo, la visita es de la etapa en curso y es la
+// visita "del momento": la primera, en orden cronológico, que aún no completó dentro de su etapa.
 async function registrarAvance(visitaProgramadaId, { descripcion }) {
   console.log('Modelo: registrando el avance de la visita', visitaProgramadaId);
 
@@ -299,9 +322,14 @@ async function registrarAvance(visitaProgramadaId, { descripcion }) {
   if (texto(filaVisita.get('estado')) !== ESTADO_ACTIVO) {
     throw errorHttp(409, 'El servicio todavía no está activo');
   }
+  if (TIPOS_VISITA.indexOf(tipoDe(fila)) !== etapasFinalizadas(filaVisita)) {
+    throw errorHttp(409, 'Primero deben finalizarse las etapas anteriores');
+  }
 
   const actual = datos.filas.programadas
-    .filter(f => mismoId(f.get('visitaId'), fila.get('visitaId')) && !estaCompletada(f))
+    .filter(f =>
+      mismoId(f.get('visitaId'), fila.get('visitaId')) && tipoDe(f) === tipoDe(fila) && !estaCompletada(f)
+    )
     .sort((a, b) => clave(a).localeCompare(clave(b)))[0];
   if (!mismoId(actual?.get('visitaProgramadaId'), visitaProgramadaId)) {
     throw errorHttp(409, 'Primero debes completar las visitas anteriores');
@@ -314,7 +342,38 @@ async function registrarAvance(visitaProgramadaId, { descripcion }) {
   return armarProgramada(fila);
 }
 
+// El empleado da por terminada la etapa en curso (sin importar cuántas visitas tuvo) y habilita la siguiente.
+// Exige al menos una visita y que el técnico haya completado todas, para no dejar visitas sin reporte.
+async function finalizarEtapa(visitaId) {
+  console.log('Modelo: finalizando la etapa en curso del servicio', visitaId);
+
+  const datos = await cargarDatos();
+  const fila = buscarVisita(datos, visitaId);
+  exigirServicioAbierto(fila);
+
+  if (texto(fila.get('estado')) !== ESTADO_ACTIVO) {
+    throw errorHttp(409, 'El servicio todavía no está activo');
+  }
+
+  const finalizadas = etapasFinalizadas(fila);
+  if (finalizadas >= TIPOS_VISITA.length) throw errorHttp(409, 'Todas las etapas del servicio ya fueron finalizadas');
+
+  const visitasEtapa = datos.filas.programadas.filter(f =>
+    mismoId(f.get('visitaId'), visitaId) && tipoDe(f) === TIPOS_VISITA[finalizadas]
+  );
+  if (visitasEtapa.length === 0) throw errorHttp(409, 'Programa al menos una visita antes de finalizar la etapa');
+  if (!visitasEtapa.every(estaCompletada)) {
+    throw errorHttp(409, 'El técnico aún tiene visitas pendientes en esta etapa');
+  }
+
+  fila.set('etapasFinalizadas', finalizadas + 1);
+  await fila.save({ raw: true });
+
+  return armarVisitas(datos, visitaId)[0];
+}
+
 module.exports = {
+  TIPOS_VISITA,
   getVisitas,
   getVisitasProgramadas,
   crearVisitaDeSolicitud,
@@ -325,4 +384,5 @@ module.exports = {
   actualizarProgramada,
   eliminarProgramada,
   registrarAvance,
+  finalizarEtapa,
 };

@@ -101,10 +101,13 @@ async function crearProgramada(req, res) {
     const visitaId = aEntero(req.params.id);
     if (!visitaId) return res.status(400).json({ message: 'Visita inválida' });
 
+    const { tipo } = req.body || {};
+    if (!visitaModel.TIPOS_VISITA.includes(tipo)) return res.status(400).json({ message: 'Tipo de visita inválido' });
+
     const { error, datos } = validarDatosProgramada(req.body);
     if (error) return res.status(400).json({ message: error });
 
-    res.status(201).json(await visitaModel.crearProgramada(visitaId, datos));
+    res.status(201).json(await visitaModel.crearProgramada(visitaId, { tipo, ...datos }));
   } catch (error) {
     responderError(res, 'Error al programar la visita', error);
   }
@@ -155,6 +158,18 @@ async function registrarAvance(req, res) {
   }
 }
 
+async function finalizarEtapa(req, res) {
+  console.log('Controlador: llegando a POST /visitas/:id/finalizar-etapa');
+  try {
+    const visitaId = aEntero(req.params.id);
+    if (!visitaId) return res.status(400).json({ message: 'Visita inválida' });
+
+    res.status(200).json(await visitaModel.finalizarEtapa(visitaId));
+  } catch (error) {
+    responderError(res, 'Error al finalizar la etapa', error);
+  }
+}
+
 module.exports = {
   getVisitas,
   getVisitasProgramadas,
@@ -165,4 +180,5 @@ module.exports = {
   actualizarProgramada,
   eliminarProgramada,
   registrarAvance,
+  finalizarEtapa,
 };

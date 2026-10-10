@@ -68,6 +68,22 @@ async function activarPorSolicitud(req, res) {
   }
 }
 
+// Responde 200 con null cuando la solicitud no tiene visita técnica.
+async function cancelarPorSolicitud(req, res) {
+  console.log('Controlador: llegando a POST /solicitudes/:id/cancelar-visita');
+  try {
+    const solicitudId = aEntero(req.params.id);
+    const { motivo } = req.body || {};
+
+    if (!solicitudId) return res.status(400).json({ message: 'Solicitud inválida' });
+    if (!esTexto(motivo)) return res.status(400).json({ message: 'Indica el motivo de la cancelación' });
+
+    res.status(200).json(await visitaModel.cancelarPorSolicitud(solicitudId, motivo.trim()));
+  } catch (error) {
+    responderError(res, 'Error al cancelar el servicio', error);
+  }
+}
+
 async function registrarCierre(req, res) {
   console.log('Controlador: llegando a POST /visitas/:id/cierre');
   try {
@@ -175,6 +191,7 @@ module.exports = {
   getVisitasProgramadas,
   guardarDiagnostico,
   activarPorSolicitud,
+  cancelarPorSolicitud,
   registrarCierre,
   crearProgramada,
   actualizarProgramada,

@@ -4,6 +4,7 @@ const {
   getVisitasProgramadas,
   guardarDiagnostico,
   activarPorSolicitud,
+  cancelarPorSolicitud,
   registrarCierre,
   crearProgramada,
   actualizarProgramada,
@@ -24,6 +25,7 @@ router.post('/visitas/:id/diagnostico', guardarDiagnostico);
 router.post('/visitas/:id/cierre', registrarCierre);
 router.post('/visitas/:id/finalizar-etapa', finalizarEtapa);
 router.post('/solicitudes/:id/activar-visita', activarPorSolicitud);
+router.post('/solicitudes/:id/cancelar-visita', cancelarPorSolicitud);
 
 router.post('/visitas/:id/programadas', crearProgramada);
 router.put('/visitas-programadas/:id', actualizarProgramada);

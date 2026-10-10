@@ -11,9 +11,11 @@ const {
 
 // Ciclo de un servicio: AUTORIZADA (viaje autorizado) -> DIAGNÓSTICO COMPLETADO (el técnico envió su
 // diagnóstico) -> ACTIVO (el cliente aceptó la cotización; se habilitan las visitas de instalación).
+// Si el cliente rechaza la cotización, el servicio pasa a CANCELADA y ya no avanza.
 const ESTADO_AUTORIZADA = 'AUTORIZADA';
 const ESTADO_DIAGNOSTICO = 'DIAGNÓSTICO COMPLETADO';
 const ESTADO_ACTIVO = 'ACTIVO';
+const ESTADO_CANCELADA = 'CANCELADA';
 
 // Etapas posteriores al diagnóstico, en el orden en que se habilitan. Cada visita programada pertenece a una.
 // La etapa en curso es TIPOS_VISITA[etapasFinalizadas]: el empleado finaliza una etapa para habilitar la siguiente.
@@ -97,6 +99,14 @@ function armarVisitas({ filas }, soloId) {
         };
       }
 
+      if (texto(f.get('canceladaEn'))) {
+        visita.cancelacion = {
+          // Instante ISO de la cancelación; el frontend lo formatea a la hora local.
+          fecha: texto(f.get('canceladaEn')),
+          motivo: texto(f.get('motivoCancelacion')),
+        };
+      }
+
       if (texto(f.get('cierreFecha'))) {
         visita.cierre = {
           fecha: aDiaMesAnio(f.get('cierreFecha')),
@@ -145,9 +155,10 @@ function buscarProgramada(datos, visitaProgramadaId) {
 
 const estaCompletada = fila => texto(fila.get('completadaEn')) !== '';
 
-// Con el servicio cerrado ya no se agenda ni se modifica nada.
+// Con el servicio cerrado o cancelado ya no se agenda ni se modifica nada.
 function exigirServicioAbierto(filaVisita) {
   if (texto(filaVisita.get('cierreFecha'))) throw errorHttp(409, 'El servicio ya fue cerrado');
+  if (texto(filaVisita.get('estado')) === ESTADO_CANCELADA) throw errorHttp(409, 'El servicio fue cancelado');
 }
 
 async function getVisitas() {
@@ -226,6 +237,41 @@ async function activarPorSolicitud(solicitudId) {
   if (texto(fila.get('estado')) !== ESTADO_ACTIVO) {
     fila.set('estado', ESTADO_ACTIVO);
     await fila.save({ raw: true });
+  }
+
+  return armarVisitas(datos, fila.get('visitaId'))[0];
+}
+
+// Se llama al rechazar la cotización ligada a la solicitud: el servicio se cancela porque no hubo acuerdo
+// con el cliente, y la solicitud también queda CANCELADA. Devuelve la visita, o null si la solicitud no
+// tiene una. Es seguro repetirla: completa lo que haya quedado a medias en un intento anterior.
+async function cancelarPorSolicitud(solicitudId, motivo) {
+  console.log('Modelo: cancelando el servicio de la solicitud', solicitudId);
+
+  const datos = await cargarDatos();
+  const fila = datos.filas.visitas.find(f => mismoId(f.get('solicitudId'), solicitudId));
+  if (!fila) return null;
+
+  const faltantes = ['motivoCancelacion', 'canceladaEn'].filter(c => !(datos.hojas.visitas.headerValues || []).includes(c));
+  if (faltantes.length) {
+    throw new Error(`La hoja 'visitasTecnicas' no tiene la(s) columna(s): ${faltantes.join(', ')}`);
+  }
+
+  const estado = texto(fila.get('estado'));
+  if (estado === ESTADO_ACTIVO) throw errorHttp(409, 'El servicio ya está activo y no se puede cancelar');
+  if (texto(fila.get('cierreFecha'))) throw errorHttp(409, 'El servicio ya fue cerrado');
+
+  if (estado !== ESTADO_CANCELADA) {
+    fila.set('estado', ESTADO_CANCELADA);
+    fila.set('motivoCancelacion', motivo);
+    fila.set('canceladaEn', new Date().toISOString());
+    await fila.save({ raw: true });
+  }
+
+  const filaSolicitud = datos.filas.solicitudes.find(f => mismoId(f.get('solicitudId'), solicitudId));
+  if (filaSolicitud && texto(filaSolicitud.get('estado')) !== 'CANCELADA') {
+    filaSolicitud.set('estado', 'CANCELADA');
+    await filaSolicitud.save({ raw: true });
   }
 
   return armarVisitas(datos, fila.get('visitaId'))[0];
@@ -379,6 +425,7 @@ module.exports = {
   crearVisitaDeSolicitud,
   guardarDiagnostico,
   activarPorSolicitud,
+  cancelarPorSolicitud,
   registrarCierre,
   crearProgramada,
   actualizarProgramada,

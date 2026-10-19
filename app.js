@@ -8,6 +8,7 @@ const driveRoutes = require('./routes/driveRoutes');
 const authRoutes = require('./routes/authRoutes');
 const solicitudRoutes = require('./routes/solicitudRoutes');
 const visitaRoutes = require('./routes/visitaRoutes');
+const notificacionRoutes = require('./routes/notificacionRoutes');
 const cors = require('cors');
 require('dotenv').config();
 
@@ -16,7 +17,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors({
   origin: '*', // O '*' para permitir cualquier origen en desarrollo
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
@@ -34,6 +35,7 @@ app.use('/api', driveRoutes);
 app.use('/api', authRoutes);
 app.use('/api', solicitudRoutes);
 app.use('/api', visitaRoutes);
+app.use('/api', notificacionRoutes);
 
 app.get('/', (req, res) => {
   console.log('GET / recibido');

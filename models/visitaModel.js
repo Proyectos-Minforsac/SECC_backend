@@ -17,9 +17,11 @@ const ESTADO_DIAGNOSTICO = 'DIAGNÓSTICO COMPLETADO';
 const ESTADO_ACTIVO = 'ACTIVO';
 const ESTADO_CANCELADA = 'CANCELADA';
 
-// Etapas posteriores al diagnóstico, en el orden en que se habilitan. Cada visita programada pertenece a una.
-// La etapa en curso es TIPOS_VISITA[etapasFinalizadas]: el empleado finaliza una etapa para habilitar la siguiente.
+// Etapas posteriores al diagnóstico. Cada visita programada pertenece a una. Solo la instalación se finaliza:
+// al hacerlo el técnico recibe a la vez el mantenimiento preventivo (periódico) y el soporte técnico (por
+// falla), que siguen disponibles hasta que se cierre el servicio.
 const TIPOS_VISITA = ['INSTALACION', 'MANTENIMIENTO', 'SOPORTE'];
+const TIPO_INSTALACION = TIPOS_VISITA[0];
 
 const SEPARADOR_COMPONENTES = ';';
 
@@ -55,8 +57,11 @@ async function cargarDatos() {
   return { hojas, filas: { visitas, programadas, solicitudes, ofertas, clientes, tecnicos } };
 }
 
-// Etapas posteriores al diagnóstico que el empleado ya finalizó (0 si la columna está vacía).
+// Etapas que el empleado ya finalizó (0 si la columna está vacía). Solo la instalación se finaliza, así que
+// con 1 o más ya está finalizada; los servicios antiguos pueden traer valores mayores.
 const etapasFinalizadas = filaVisita => Number(texto(filaVisita.get('etapasFinalizadas'))) || 0;
+
+const instalacionFinalizada = filaVisita => etapasFinalizadas(filaVisita) >= 1;
 
 // Las visitas programadas anteriores a la columna "tipo" eran todas de instalación.
 const tipoDe = fila => texto(fila.get('tipo')) || TIPOS_VISITA[0];
@@ -291,8 +296,8 @@ async function registrarCierre(visitaId, carpetaUrl) {
   return armarVisitas(datos, visitaId)[0];
 }
 
-// Se puede programar en la etapa en curso o en las siguientes (el técnico las verá bloqueadas hasta que
-// se finalicen las anteriores), pero no en una etapa ya finalizada.
+// Se puede programar en cualquier etapa (el técnico verá bloqueados el mantenimiento y el soporte hasta que se
+// finalice la instalación), salvo en la instalación una vez finalizada.
 async function crearProgramada(visitaId, { tipo, fecha, horaInicio, horaFin, descripcionTareas }) {
   console.log('Modelo: programando una visita del servicio', visitaId);
 
@@ -304,8 +309,8 @@ async function crearProgramada(visitaId, { tipo, fecha, horaInicio, horaFin, des
   if (texto(filaVisita.get('estado')) !== ESTADO_ACTIVO) {
     throw errorHttp(409, 'El servicio todavía no está activo');
   }
-  if (TIPOS_VISITA.indexOf(tipo) < etapasFinalizadas(filaVisita)) {
-    throw errorHttp(409, 'La etapa ya fue finalizada y no admite más visitas');
+  if (tipo === TIPO_INSTALACION && instalacionFinalizada(filaVisita)) {
+    throw errorHttp(409, 'La instalación ya fue finalizada y no admite más visitas');
   }
 
   const visitaProgramadaId = siguienteId(filas.programadas, 'visitaProgramadaId');
@@ -355,7 +360,7 @@ async function eliminarProgramada(visitaProgramadaId) {
   return { visitaProgramadaId: Number(visitaProgramadaId) };
 }
 
-// El técnico deja su avance. Solo cuando el servicio está activo, la visita es de la etapa en curso y es la
+// El técnico deja su avance. Solo cuando el servicio está activo, la visita es de una etapa habilitada y es la
 // visita "del momento": la primera, en orden cronológico, que aún no completó dentro de su etapa.
 async function registrarAvance(visitaProgramadaId, { descripcion }) {
   console.log('Modelo: registrando el avance de la visita', visitaProgramadaId);
@@ -368,8 +373,11 @@ async function registrarAvance(visitaProgramadaId, { descripcion }) {
   if (texto(filaVisita.get('estado')) !== ESTADO_ACTIVO) {
     throw errorHttp(409, 'El servicio todavía no está activo');
   }
-  if (TIPOS_VISITA.indexOf(tipoDe(fila)) !== etapasFinalizadas(filaVisita)) {
-    throw errorHttp(409, 'Primero deben finalizarse las etapas anteriores');
+  // La instalación se trabaja hasta que se finaliza; el mantenimiento y el soporte, a partir de entonces.
+  if ((tipoDe(fila) === TIPO_INSTALACION) === instalacionFinalizada(filaVisita)) {
+    throw errorHttp(409, instalacionFinalizada(filaVisita)
+      ? 'La instalación ya fue finalizada'
+      : 'Primero debe finalizarse la instalación');
   }
 
   const actual = datos.filas.programadas
@@ -388,10 +396,11 @@ async function registrarAvance(visitaProgramadaId, { descripcion }) {
   return armarProgramada(fila);
 }
 
-// El empleado da por terminada la etapa en curso (sin importar cuántas visitas tuvo) y habilita la siguiente.
-// Exige al menos una visita y que el técnico haya completado todas, para no dejar visitas sin reporte.
+// El empleado da por terminada la instalación (sin importar cuántas visitas tuvo) y habilita a la vez el
+// mantenimiento preventivo y el soporte técnico. Exige al menos una visita y que el técnico haya completado
+// todas, para no dejar visitas sin reporte. El mantenimiento y el soporte no se finalizan: terminan al cerrar el servicio.
 async function finalizarEtapa(visitaId) {
-  console.log('Modelo: finalizando la etapa en curso del servicio', visitaId);
+  console.log('Modelo: finalizando la instalación del servicio', visitaId);
 
   const datos = await cargarDatos();
   const fila = buscarVisita(datos, visitaId);
@@ -401,18 +410,17 @@ async function finalizarEtapa(visitaId) {
     throw errorHttp(409, 'El servicio todavía no está activo');
   }
 
-  const finalizadas = etapasFinalizadas(fila);
-  if (finalizadas >= TIPOS_VISITA.length) throw errorHttp(409, 'Todas las etapas del servicio ya fueron finalizadas');
+  if (instalacionFinalizada(fila)) throw errorHttp(409, 'La instalación ya fue finalizada');
 
   const visitasEtapa = datos.filas.programadas.filter(f =>
-    mismoId(f.get('visitaId'), visitaId) && tipoDe(f) === TIPOS_VISITA[finalizadas]
+    mismoId(f.get('visitaId'), visitaId) && tipoDe(f) === TIPO_INSTALACION
   );
   if (visitasEtapa.length === 0) throw errorHttp(409, 'Programa al menos una visita antes de finalizar la etapa');
   if (!visitasEtapa.every(estaCompletada)) {
     throw errorHttp(409, 'El técnico aún tiene visitas pendientes en esta etapa');
   }
 
-  fila.set('etapasFinalizadas', finalizadas + 1);
+  fila.set('etapasFinalizadas', 1);
   await fila.save({ raw: true });
 
   return armarVisitas(datos, visitaId)[0];

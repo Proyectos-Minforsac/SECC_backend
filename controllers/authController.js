@@ -1,18 +1,5 @@
 const usuarioModel = require('../models/usuarioModel');
 
-// Roles de la hoja "usuarios" -> roles que entiende el frontend.
-function normalizarRol(rol) {
-  const valor = String(rol || '')
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '');
-
-  if (valor === 'trabajador') return 'empleado';
-  if (valor === 'tecnico') return 'tecnico';
-  return null;
-}
-
 async function login(req, res) {
   console.log('Controlador: llegando a POST /login');
 
@@ -29,7 +16,7 @@ async function login(req, res) {
       return res.status(401).json({ message: 'Usuario o contraseña incorrectos' });
     }
 
-    const rol = normalizarRol(usuario.rol);
+    const rol = usuarioModel.normalizarRol(usuario.rol);
     if (!rol) {
       console.error('Controlador: rol no reconocido en la hoja usuarios:', usuario.rol);
       return res.status(403).json({ message: 'El usuario no tiene un rol válido' });

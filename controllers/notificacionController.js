@@ -16,7 +16,9 @@ const esTexto = valor => typeof valor === 'string' && valor.trim() !== '';
 async function getNotificaciones(req, res) {
   console.log('Controlador: llegando a GET /notificaciones');
   try {
-    const { rol, nombre } = req.query;
+    const { nombre } = req.query;
+    // rolActual acepta el nombre anterior 'empleado', por si algún navegador aún tiene la versión vieja de la página.
+    const rol = notificacionModel.rolActual(req.query.rol);
     if (!notificacionModel.ROLES.includes(rol)) return res.status(400).json({ message: 'Rol inválido' });
 
     res.status(200).json(await notificacionModel.getNotificaciones(rol, typeof nombre === 'string' ? nombre : ''));
@@ -28,7 +30,8 @@ async function getNotificaciones(req, res) {
 async function crearNotificacion(req, res) {
   console.log('Controlador: llegando a POST /notificaciones');
   try {
-    const { rolDestino, tecnicoDestino, tipo, mensaje, solicitudId, clave } = req.body || {};
+    const { tecnicoDestino, tipo, mensaje, solicitudId, clave } = req.body || {};
+    const rolDestino = notificacionModel.rolActual((req.body || {}).rolDestino);
 
     if (!notificacionModel.ROLES.includes(rolDestino)) return res.status(400).json({ message: 'Rol inválido' });
     if (!esTexto(mensaje)) return res.status(400).json({ message: 'Falta el mensaje de la notificación' });

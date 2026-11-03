@@ -12,6 +12,7 @@ const {
   registrarAvance,
   finalizarEtapa,
 } = require('../controllers/visitaController');
+const { exigirRol } = require('../services/autorizacion');
 
 const router = express.Router();
 
@@ -22,8 +23,10 @@ router.get('/visitas-programadas', getVisitasProgramadas);
 
 // La visita técnica la crea POST /solicitudes/:id/autorizar; aquí solo avanza su ciclo.
 router.post('/visitas/:id/diagnostico', guardarDiagnostico);
-router.post('/visitas/:id/cierre', registrarCierre);
-router.post('/visitas/:id/finalizar-etapa', finalizarEtapa);
+// Cerrar el servicio y finalizar la instalación llevan los costos reales: son del trabajador y el jefe, no del técnico.
+const interno = exigirRol('trabajador', 'jefe');
+router.post('/visitas/:id/cierre', interno, registrarCierre);
+router.post('/visitas/:id/finalizar-etapa', interno, finalizarEtapa);
 router.post('/solicitudes/:id/activar-visita', activarPorSolicitud);
 router.post('/solicitudes/:id/cancelar-visita', cancelarPorSolicitud);
 

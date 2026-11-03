@@ -9,6 +9,10 @@ const authRoutes = require('./routes/authRoutes');
 const solicitudRoutes = require('./routes/solicitudRoutes');
 const visitaRoutes = require('./routes/visitaRoutes');
 const notificacionRoutes = require('./routes/notificacionRoutes');
+const tarifarioRoutes = require('./routes/tarifarioRoutes');
+const estimacionRoutes = require('./routes/estimacionRoutes');
+const costoRealRoutes = require('./routes/costoRealRoutes');
+const rentabilidadRoutes = require('./routes/rentabilidadRoutes');
 const cors = require('cors');
 require('dotenv').config();
 
@@ -36,6 +40,10 @@ app.use('/api', authRoutes);
 app.use('/api', solicitudRoutes);
 app.use('/api', visitaRoutes);
 app.use('/api', notificacionRoutes);
+app.use('/api', tarifarioRoutes);
+app.use('/api', estimacionRoutes);
+app.use('/api', costoRealRoutes);
+app.use('/api', rentabilidadRoutes);
 
 app.get('/', (req, res) => {
   console.log('GET / recibido');

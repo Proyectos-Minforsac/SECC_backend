@@ -1,5 +1,5 @@
 const { conectar } = require('../services/sheetsService');
-const { errorHttp, texto, mismoId, exigirColumnas, siguienteId, borrarFilas } = require('../services/hojasUtils');
+const { errorHttp, texto, mismoId, cargarEncabezados, exigirColumnas, siguienteId, borrarFilas } = require('../services/hojasUtils');
 const { GARANTIA_MESES_DEFECTO } = require('../services/garantia');
 const { ESTADO, ACCION, aNumeroONulo, motivoDeBloqueo } = require('../services/validacion');
 const estimacionModel = require('./estimacionModel');
@@ -19,7 +19,7 @@ function generarNumeroCotizacion(cotizacionId) {
 }
 
 // Las hojas que forman una cotización. Se leen de a una para no forzar el estado interno de la librería.
-function hojasDeCotizacion(doc) {
+async function hojasDeCotizacion(doc) {
   const hojas = {
     hojaCotizaciones: doc.sheetsByTitle['cotizaciones'],
     hojaItems: doc.sheetsByTitle['items'],
@@ -31,6 +31,9 @@ function hojasDeCotizacion(doc) {
   if (!hojas.hojaItems) throw new Error("Falta la hoja 'items'");
   if (!hojas.hojaItemsCotizacion) throw new Error("Falta la hoja 'itemsCotizacion'");
   if (!hojas.hojaDetalleImpresora) throw new Error("Falta la hoja 'detalleImpresora'");
+
+  // Aún no se leyeron las filas de estas hojas, así que sus encabezados no están cargados
+  await cargarEncabezados(hojas.hojaCotizaciones, hojas.hojaItemsCotizacion, hojas.hojaDetalleImpresora);
 
   exigirColumnas(hojas.hojaCotizaciones, ['subtotal', 'igv', 'total', 'garantiaMeses'], 'cotizaciones');
   exigirColumnas(
@@ -174,7 +177,7 @@ async function createCotizacionCompleta({
   justificacion,
 }) {
   const doc = await conectar();
-  const hojas = hojasDeCotizacion(doc);
+  const hojas = await hojasDeCotizacion(doc);
   const { hojaCotizaciones, hojaItems, hojaItemsCotizacion, hojaDetalleImpresora } = hojas;
 
   // Lectura de filas (secuencial para no forzar el estado interno de la librería)
@@ -280,7 +283,7 @@ async function createCotizacionCompleta({
  */
 async function editarCotizacionDevuelta({ cotizacionId, solicitante, moneda = 'SOLES', garantiaMeses = GARANTIA_MESES_DEFECTO, items = [], estimacion, usuario, justificacion }) {
   const doc = await conectar();
-  const hojas = hojasDeCotizacion(doc);
+  const hojas = await hojasDeCotizacion(doc);
   const { hojaCotizaciones, hojaItems, hojaItemsCotizacion, hojaDetalleImpresora } = hojas;
 
   const filaCotizacion = (await hojaCotizaciones.getRows()).find(f => mismoId(f.get('cotizacionId'), cotizacionId));

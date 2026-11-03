@@ -35,9 +35,52 @@ const aDiaMesAnio = valor => {
 // Fecha de hoy en Perú, "YYYY-MM-DD".
 const hoyISO = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
 
+// La librería solo conoce los encabezados de una hoja después de leerla (getRows) o de pedirlos (loadHeaderRow); antes,
+// hoja.headerValues lanza "Header values are not yet loaded". Llamar esto antes de exigirColumnas cuando todavía no se
+// hayan leído las filas de esa hoja. Si los encabezados ya están, no hace ninguna llamada a Sheets.
+async function cargarEncabezados(...hojas) {
+  for (const hoja of hojas) {
+    try {
+      void hoja.headerValues;
+    } catch {
+      await hoja.loadHeaderRow();
+    }
+  }
+}
+
+// Verifica que la hoja tenga las columnas que se van a escribir (evita que se pierdan datos en silencio).
+// Las columnas nuevas se agregan con: npm run hojas:preparar
+// Los encabezados deben estar cargados (ver cargarEncabezados).
+function exigirColumnas(hoja, columnas, nombreHoja) {
+  const encabezados = hoja.headerValues || [];
+  const faltantes = columnas.filter(c => !encabezados.includes(c));
+  if (faltantes.length) {
+    throw new Error(
+      `La hoja '${nombreHoja}' no tiene la(s) columna(s): ${faltantes.join(', ')} (se agregan con npm run hojas:preparar)`
+    );
+  }
+}
+
 function siguienteId(filas, campo) {
   const ids = filas.map(f => parseInt(f.get(campo), 10)).filter(Number.isInteger);
   return (ids.length ? Math.max(...ids) : 0) + 1;
+}
+
+// Borra varias filas de una hoja con pocas llamadas a Sheets (cada una cuenta para el límite por minuto): agrupa las
+// filas consecutivas y borra de abajo hacia arriba, así los números de fila de las que faltan no se corren.
+// Las filas deben venir de una lectura reciente de esa hoja (getRows con opciones lee directo, sin caché).
+async function borrarFilas(hoja, filas) {
+  const numeros = [...new Set(filas.map(f => f.rowNumber))].sort((a, b) => b - a);
+
+  let i = 0;
+  while (i < numeros.length) {
+    const ultima = numeros[i];
+    let primera = ultima;
+    while (i + 1 < numeros.length && numeros[i + 1] === primera - 1) primera = numeros[++i];
+    // deleteRows trabaja con índices desde 0 y el final excluido; rowNumber cuenta desde 1 (la fila 1 es el encabezado)
+    await hoja.deleteRows(primera - 1, ultima);
+    i++;
+  }
 }
 
 module.exports = {
@@ -48,5 +91,8 @@ module.exports = {
   aISO,
   aDiaMesAnio,
   hoyISO,
+  cargarEncabezados,
+  exigirColumnas,
   siguienteId,
+  borrarFilas,
 };

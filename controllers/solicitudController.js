@@ -29,10 +29,11 @@ async function getSolicitudes(req, res) {
 
 // Valida el cuerpo de crear/editar. Devuelve { error } o { datos } ya normalizados.
 function validarDatosSolicitud(cuerpo) {
-  const { clienteId, descripcion, tecnicoIds } = cuerpo || {};
+  const { clienteId, descripcion, tipoServicio, tecnicoIds } = cuerpo || {};
 
   if (!aEntero(clienteId)) return { error: 'Seleccione un cliente' };
   if (typeof descripcion !== 'string' || !descripcion.trim()) return { error: 'Ingrese una descripción' };
+  if (!solicitudModel.TIPOS_SERVICIO.includes(tipoServicio)) return { error: 'Seleccione el tipo de servicio' };
   if (!Array.isArray(tecnicoIds) || tecnicoIds.length === 0 || !tecnicoIds.every(aEntero)) {
     return { error: 'Seleccione al menos un técnico' };
   }
@@ -41,6 +42,7 @@ function validarDatosSolicitud(cuerpo) {
     datos: {
       clienteId: aEntero(clienteId),
       descripcion: descripcion.trim(),
+      tipoServicio,
       tecnicoIds: tecnicoIds.map(aEntero),
     },
   };

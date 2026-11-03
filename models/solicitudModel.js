@@ -9,10 +9,15 @@ const {
   aISO,
   aDiaMesAnio,
   hoyISO,
+  exigirColumnas,
   siguienteId,
 } = require('../services/hojasUtils');
 
 const ESTADOS_QUE_ADMITEN_OFERTAS = ['PENDIENTE', 'CON OFERTAS'];
+
+// Son los mismos servicios que ofrecen los técnicos (campo "servicio" de la hoja tecnicos), para poder
+// enviar la solicitud solo a quienes lo prestan. Para agregar un tipo basta con sumarlo aquí y en el frontend.
+const TIPOS_SERVICIO = ['Aire Condicionado', 'Cableado estructurado'];
 
 // Estructura en Drive, bajo la carpeta raíz del sistema:
 //   Solicitudes de Servicio/Solicitud N° X - Cliente/   ofertas de los técnicos (temporal)
@@ -120,6 +125,8 @@ function armarSolicitudes({ filas }, soloId) {
         solicitudId: Number(solicitudId),
         clienteNombre: cliente?.nombre ?? '',
         descripcion: texto(f.get('descripcion')),
+        // Vacío en las solicitudes anteriores a este campo.
+        tipoServicio: texto(f.get('tipoServicio')),
         fecha: aDiaMesAnio(f.get('fecha')),
         tecnicos: (tecnicosDeSolicitud.get(solicitudId) ?? []).map(t => t.nombre),
         tecnicoIds: (tecnicosDeSolicitud.get(solicitudId) ?? []).map(t => t.tecnicoId),
@@ -178,11 +185,12 @@ async function getAllSolicitudes() {
   return armarSolicitudes(datos);
 }
 
-async function createSolicitud({ clienteId, descripcion, tecnicoIds }) {
-  console.log('Modelo: creando solicitud', { clienteId, descripcion, tecnicoIds });
+async function createSolicitud({ clienteId, descripcion, tipoServicio, tecnicoIds }) {
+  console.log('Modelo: creando solicitud', { clienteId, descripcion, tipoServicio, tecnicoIds });
 
   const datos = await cargarDatos();
   const { hojas, filas } = datos;
+  exigirColumnas(hojas.solicitudes, ['tipoServicio'], 'solicitudes');
 
   const idsTecnicos = validarClienteYTecnicos(filas, clienteId, tecnicoIds);
 
@@ -193,6 +201,7 @@ async function createSolicitud({ clienteId, descripcion, tecnicoIds }) {
     solicitudId,
     clienteId,
     descripcion,
+    tipoServicio,
     fecha: hoyISO(),
     estado: 'PENDIENTE',
     instrucciones: '',
@@ -211,12 +220,15 @@ async function createSolicitud({ clienteId, descripcion, tecnicoIds }) {
 }
 
 // Edita la solicitud mientras no esté asignada. Con ofertas ya enviadas no se puede cambiar el cliente
-// (las ofertas se guardan en una carpeta con su nombre) ni quitar a un técnico que ya ofertó.
-async function updateSolicitud(solicitudId, { clienteId, descripcion, tecnicoIds }) {
+// (las ofertas se guardan en una carpeta con su nombre), cambiar el tipo de servicio (los técnicos ofertaron
+// para ese servicio) ni quitar a un técnico que ya ofertó. Si la solicitud es anterior al tipo de servicio,
+// se le puede asignar uno aunque tenga ofertas.
+async function updateSolicitud(solicitudId, { clienteId, descripcion, tipoServicio, tecnicoIds }) {
   console.log('Modelo: editando solicitud', solicitudId);
 
   const datos = await cargarDatos();
   const { hojas, filas } = datos;
+  exigirColumnas(hojas.solicitudes, ['tipoServicio'], 'solicitudes');
 
   const filaSolicitud = buscarSolicitud(datos, solicitudId);
   exigirSinAsignar(filaSolicitud, 'modificar');
@@ -225,6 +237,10 @@ async function updateSolicitud(solicitudId, { clienteId, descripcion, tecnicoIds
   const ofertas = filas.ofertas.filter(f => mismoId(f.get('solicitudId'), solicitudId));
   if (ofertas.length > 0 && !mismoId(filaSolicitud.get('clienteId'), clienteId)) {
     throw errorHttp(409, 'No se puede cambiar el cliente: la solicitud ya tiene ofertas');
+  }
+  const tipoActual = texto(filaSolicitud.get('tipoServicio'));
+  if (ofertas.length > 0 && tipoActual && tipoActual !== tipoServicio) {
+    throw errorHttp(409, 'No se puede cambiar el tipo de servicio: la solicitud ya tiene ofertas');
   }
 
   const actuales = filas.solicitudTecnicos.filter(f => mismoId(f.get('solicitudId'), solicitudId));
@@ -240,6 +256,7 @@ async function updateSolicitud(solicitudId, { clienteId, descripcion, tecnicoIds
   // Todas las validaciones pasaron: recién ahora se escribe.
   filaSolicitud.set('clienteId', clienteId);
   filaSolicitud.set('descripcion', descripcion);
+  filaSolicitud.set('tipoServicio', tipoServicio);
   await filaSolicitud.save({ raw: true });
 
   await eliminarFilas(aQuitar);
@@ -357,7 +374,7 @@ async function enviarOferta(solicitudId, { tecnicoNombre, montoVisita, archivo }
   return armarSolicitudes(datos, solicitudId)[0];
 }
 
-// El empleado acepta o rechaza una oferta. Aceptarla asigna la solicitud.
+// El trabajador acepta o rechaza una oferta. Aceptarla asigna la solicitud.
 async function decidirOferta(solicitudId, ofertaId, decision) {
   console.log('Modelo:', decision, 'oferta', ofertaId, 'de la solicitud', solicitudId);
 
@@ -395,7 +412,7 @@ async function decidirOferta(solicitudId, ofertaId, decision) {
   return armarSolicitudes(datos, solicitudId)[0];
 }
 
-// El empleado autoriza el viaje del técnico cuya oferta aceptó.
+// El trabajador autoriza el viaje del técnico cuya oferta aceptó.
 async function autorizarViaje(solicitudId, { instrucciones, fechaInicio, fechaFin }) {
   console.log('Modelo: autorizando viaje de la solicitud', solicitudId);
 
@@ -442,6 +459,7 @@ async function getArchivoOferta(ofertaId) {
 }
 
 module.exports = {
+  TIPOS_SERVICIO,
   getAllSolicitudes,
   createSolicitud,
   updateSolicitud,

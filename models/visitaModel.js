@@ -6,8 +6,12 @@ const {
   aDiaMesAnio,
   aISO,
   hoyISO,
+  exigirColumnas,
   siguienteId,
 } = require('../services/hojasUtils');
+const { garantiaGuardada, esGarantiaValida } = require('../services/garantia');
+const parametroCostoModel = require('./parametroCostoModel');
+const costoRealModel = require('./costoRealModel');
 
 // Ciclo de un servicio: AUTORIZADA (viaje autorizado) -> DIAGNÓSTICO COMPLETADO (el técnico envió su
 // diagnóstico) -> ACTIVO (el cliente aceptó la cotización; se habilitan las visitas de instalación).
@@ -45,19 +49,21 @@ async function cargarDatos() {
   const faltante = Object.entries(hojas).find(([, hoja]) => !hoja);
   if (faltante) throw new Error(`No existe la hoja "${faltante[0]}" en el Excel`);
 
-  const [visitas, programadas, solicitudes, ofertas, clientes, tecnicos] = await Promise.all([
+  const [visitas, programadas, solicitudes, ofertas, clientes, tecnicos, parametros] = await Promise.all([
     hojas.visitas.getRows(),
     hojas.programadas.getRows(),
     hojas.solicitudes.getRows(),
     hojas.ofertas.getRows(),
     hojas.clientes.getRows(),
     hojas.tecnicos.getRows(),
+    // Parámetros que fija el jefe (aquí solo importa la garantía por defecto).
+    parametroCostoModel.getValores(),
   ]);
 
-  return { hojas, filas: { visitas, programadas, solicitudes, ofertas, clientes, tecnicos } };
+  return { hojas, filas: { visitas, programadas, solicitudes, ofertas, clientes, tecnicos }, parametros };
 }
 
-// Etapas que el empleado ya finalizó (0 si la columna está vacía). Solo la instalación se finaliza, así que
+// Etapas que el trabajador ya finalizó (0 si la columna está vacía). Solo la instalación se finaliza, así que
 // con 1 o más ya está finalizada; los servicios antiguos pueden traer valores mayores.
 const etapasFinalizadas = filaVisita => Number(texto(filaVisita.get('etapasFinalizadas'))) || 0;
 
@@ -68,7 +74,7 @@ const tipoDe = fila => texto(fila.get('tipo')) || TIPOS_VISITA[0];
 
 // Une las hojas y devuelve las visitas con la forma que consume el frontend. El cliente, las
 // instrucciones y la fecha no se duplican en visitasTecnicas: salen de la solicitud.
-function armarVisitas({ filas }, soloId) {
+function armarVisitas({ filas, parametros }, soloId) {
   const solicitudesPorId = new Map(filas.solicitudes.map(f => [texto(f.get('solicitudId')), f]));
   const clientesPorId = new Map(filas.clientes.map(f => [texto(f.get('clienteId')), f]));
   const tecnicosPorId = new Map(filas.tecnicos.map(f => [texto(f.get('tecnicoId')), f]));
@@ -85,11 +91,14 @@ function armarVisitas({ filas }, soloId) {
         solicitudId: Number(texto(f.get('solicitudId'))),
         clienteNombre: texto(cliente?.get('nombre')),
         tecnicoNombre: texto(tecnico?.get('nombre')),
-        // Instrucciones y fecha tentativa de inicio que el empleado fijó al autorizar el viaje.
+        // Instrucciones y fecha tentativa de inicio que el trabajador fijó al autorizar el viaje.
         descripcion: texto(solicitud?.get('instrucciones')),
         fecha: aDiaMesAnio(solicitud?.get('fechaInicio')),
         estado: texto(f.get('estado')) || ESTADO_AUTORIZADA,
         etapasFinalizadas: etapasFinalizadas(f),
+        // Meses de garantía acordados en la cotización aceptada; los servicios sin dato usan la garantía por
+        // defecto que fijó el jefe.
+        garantiaMeses: garantiaGuardada(f.get('garantiaMeses'), parametros.GARANTIA_MESES_DEFECTO),
       };
 
       if (texto(f.get('diagnosticoEn'))) {
@@ -229,8 +238,23 @@ async function guardarDiagnostico(visitaId, { descripcion, componentes }) {
   return armarVisitas(datos, visitaId)[0];
 }
 
-// Se llama al aceptar la cotización ligada a la solicitud: habilita la etapa de Instalación.
-// Devuelve la visita, o null si la solicitud no tiene una (la cotización no nació de una visita técnica).
+// Garantía acordada en la cotización aceptada de la solicitud (la más reciente si hay varias), o null si
+// ninguna la trae. La cotización ya debe estar marcada como ACEPTADA.
+async function garantiaDeLaCotizacionAceptada(solicitudId) {
+  const hoja = (await conectar()).sheetsByTitle['cotizaciones'];
+  if (!hoja) return null;
+
+  const aceptadas = (await hoja.getRows())
+    .filter(f => mismoId(f.get('solicitudId'), solicitudId) && texto(f.get('estado')) === 'ACEPTADA')
+    .sort((a, b) => Number(b.get('cotizacionId')) - Number(a.get('cotizacionId')));
+
+  const meses = aceptadas.map(f => Number(texto(f.get('garantiaMeses')))).find(esGarantiaValida);
+  return meses ?? null;
+}
+
+// Se llama al aceptar la cotización ligada a la solicitud: habilita la etapa de Instalación y le deja al
+// servicio la garantía acordada en esa cotización. Devuelve la visita, o null si la solicitud no tiene una
+// (la cotización no nació de una visita técnica).
 async function activarPorSolicitud(solicitudId) {
   console.log('Modelo: activando la visita técnica de la solicitud', solicitudId);
 
@@ -240,6 +264,12 @@ async function activarPorSolicitud(solicitudId) {
 
   exigirServicioAbierto(fila);
   if (texto(fila.get('estado')) !== ESTADO_ACTIVO) {
+    // Solo al activar: una cotización adicional aceptada después no cambia la garantía ya pactada.
+    const garantiaMeses = await garantiaDeLaCotizacionAceptada(solicitudId);
+    if (garantiaMeses !== null) {
+      exigirColumnas(datos.hojas.visitas, ['garantiaMeses'], 'visitasTecnicas');
+      fila.set('garantiaMeses', garantiaMeses);
+    }
     fila.set('estado', ESTADO_ACTIVO);
     await fila.save({ raw: true });
   }
@@ -282,12 +312,15 @@ async function cancelarPorSolicitud(solicitudId, motivo) {
   return armarVisitas(datos, fila.get('visitaId'))[0];
 }
 
-// El empleado cierra el servicio cuando ya subió todos sus archivos a Drive.
-async function registrarCierre(visitaId, carpetaUrl) {
+// El trabajador cierra el servicio cuando ya subió todos sus archivos a Drive. Si el servicio pasa por el control de
+// costos, antes se guarda su resumen (costo y margen reales frente a los estimados); es seguro repetirlo.
+async function registrarCierre(visitaId, carpetaUrl, usuario) {
   console.log('Modelo: cerrando el servicio de la visita', visitaId);
 
   const datos = await cargarDatos();
   const fila = buscarVisita(datos, visitaId);
+
+  await costoRealModel.registrarResumen(visitaId, usuario);
 
   fila.set('cierreFecha', hoyISO());
   fila.set('cierreCarpetaUrl', carpetaUrl);
@@ -308,6 +341,10 @@ async function crearProgramada(visitaId, { tipo, fecha, horaInicio, horaFin, des
 
   if (texto(filaVisita.get('estado')) !== ESTADO_ACTIVO) {
     throw errorHttp(409, 'El servicio todavía no está activo');
+  }
+  // Con los costos finales ya liquidados, una visita nueva quedaría sin contar
+  if (texto(filaVisita.get('liquidacionFinalEn'))) {
+    throw errorHttp(409, 'Ya se liquidaron los costos finales del servicio: ciérralo en el Historial de Servicios');
   }
   if (tipo === TIPO_INSTALACION && instalacionFinalizada(filaVisita)) {
     throw errorHttp(409, 'La instalación ya fue finalizada y no admite más visitas');
@@ -362,7 +399,8 @@ async function eliminarProgramada(visitaProgramadaId) {
 
 // El técnico deja su avance. Solo cuando el servicio está activo, la visita es de una etapa habilitada y es la
 // visita "del momento": la primera, en orden cronológico, que aún no completó dentro de su etapa.
-async function registrarAvance(visitaProgramadaId, { descripcion }) {
+// `imprevisto` (opcional) es el aviso del técnico: { concepto, descripcion }. El monto lo pone después el trabajador.
+async function registrarAvance(visitaProgramadaId, { descripcion, imprevisto }) {
   console.log('Modelo: registrando el avance de la visita', visitaProgramadaId);
 
   const datos = await cargarDatos();
@@ -389,6 +427,20 @@ async function registrarAvance(visitaProgramadaId, { descripcion }) {
     throw errorHttp(409, 'Primero debes completar las visitas anteriores');
   }
 
+  // El aviso se guarda antes que el avance: si falla, el técnico reintenta; si el avance falla después, el reintento no
+  // duplica el aviso (se reconoce por la visita).
+  if (imprevisto) {
+    const tecnico = datos.filas.tecnicos.find(f => mismoId(f.get('tecnicoId'), filaVisita.get('tecnicoId')));
+    await costoRealModel.registrarAvisoDeTecnico({
+      visitaId: fila.get('visitaId'),
+      visitaProgramadaId,
+      etapa: tipoDe(fila),
+      tecnicoNombre: texto(tecnico?.get('nombre')),
+      concepto: imprevisto.concepto,
+      descripcion: imprevisto.descripcion,
+    });
+  }
+
   fila.set('avanceDescripcion', descripcion);
   fila.set('completadaEn', new Date().toISOString());
   await fila.save({ raw: true });
@@ -396,10 +448,12 @@ async function registrarAvance(visitaProgramadaId, { descripcion }) {
   return armarProgramada(fila);
 }
 
-// El empleado da por terminada la instalación (sin importar cuántas visitas tuvo) y habilita a la vez el
+// El trabajador da por terminada la instalación (sin importar cuántas visitas tuvo) y habilita a la vez el
 // mantenimiento preventivo y el soporte técnico. Exige al menos una visita y que el técnico haya completado
 // todas, para no dejar visitas sin reporte. El mantenimiento y el soporte no se finalizan: terminan al cerrar el servicio.
-async function finalizarEtapa(visitaId) {
+// Si el servicio pasa por el control de costos, la etapa se finaliza junto con la liquidación de sus costos reales
+// (`etapas`, lo que confirmó el trabajador): todo se comprueba antes de escribir.
+async function finalizarEtapa(visitaId, { etapas, usuario } = {}) {
   console.log('Modelo: finalizando la instalación del servicio', visitaId);
 
   const datos = await cargarDatos();
@@ -420,7 +474,17 @@ async function finalizarEtapa(visitaId) {
     throw errorHttp(409, 'El técnico aún tiene visitas pendientes en esta etapa');
   }
 
+  const costos = await costoRealModel.cargarDatos();
+  const ctx = costoRealModel.contextoDeVisita(costos, visitaId);
+  let liquidacion = null;
+  if (ctx.aplica) {
+    if (!etapas) throw errorHttp(400, 'Confirma los costos reales de la etapa para finalizarla');
+    liquidacion = costoRealModel.prepararLiquidacion(ctx, 'INSTALACION', etapas, costos);
+    await costoRealModel.escribirLiquidacion(ctx, costos, liquidacion, usuario);
+  }
+
   fila.set('etapasFinalizadas', 1);
+  if (liquidacion) fila.set('liquidacionInstalacionEn', new Date().toISOString());
   await fila.save({ raw: true });
 
   return armarVisitas(datos, visitaId)[0];

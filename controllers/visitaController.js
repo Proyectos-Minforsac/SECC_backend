@@ -93,7 +93,7 @@ async function registrarCierre(req, res) {
     if (!visitaId) return res.status(400).json({ message: 'Visita inválida' });
     if (!esTexto(carpetaUrl)) return res.status(400).json({ message: 'Falta el enlace de la carpeta del servicio' });
 
-    res.status(200).json(await visitaModel.registrarCierre(visitaId, carpetaUrl.trim()));
+    res.status(200).json(await visitaModel.registrarCierre(visitaId, carpetaUrl.trim(), req.usuario));
   } catch (error) {
     responderError(res, 'Error al registrar el cierre del servicio', error);
   }
@@ -161,14 +161,18 @@ async function registrarAvance(req, res) {
   console.log('Controlador: llegando a POST /visitas-programadas/:id/avance');
   try {
     const visitaProgramadaId = aEntero(req.params.id);
-    const { descripcion } = req.body || {};
+    const { descripcion, imprevisto } = req.body || {};
 
     if (!visitaProgramadaId) return res.status(400).json({ message: 'Visita programada inválida' });
     if (!esTexto(descripcion)) {
       return res.status(400).json({ message: 'Ingresa la descripción del avance del servicio' });
     }
+    // El aviso de imprevisto es opcional; su contenido lo valida el modelo
+    if (imprevisto !== undefined && (imprevisto === null || typeof imprevisto !== 'object' || Array.isArray(imprevisto))) {
+      return res.status(400).json({ message: 'El aviso del imprevisto no es válido' });
+    }
 
-    res.status(200).json(await visitaModel.registrarAvance(visitaProgramadaId, { descripcion: descripcion.trim() }));
+    res.status(200).json(await visitaModel.registrarAvance(visitaProgramadaId, { descripcion: descripcion.trim(), imprevisto }));
   } catch (error) {
     responderError(res, 'Error al registrar el avance de la visita', error);
   }
@@ -180,7 +184,8 @@ async function finalizarEtapa(req, res) {
     const visitaId = aEntero(req.params.id);
     if (!visitaId) return res.status(400).json({ message: 'Visita inválida' });
 
-    res.status(200).json(await visitaModel.finalizarEtapa(visitaId));
+    // `etapas` es la liquidación de costos reales que confirmó el trabajador (solo los servicios con control de costos la exigen)
+    res.status(200).json(await visitaModel.finalizarEtapa(visitaId, { etapas: (req.body || {}).etapas, usuario: req.usuario }));
   } catch (error) {
     responderError(res, 'Error al finalizar la etapa', error);
   }

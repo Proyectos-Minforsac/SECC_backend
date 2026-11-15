@@ -4,6 +4,8 @@
 // se borra: un cambio es una tarifa nueva, y la que rige es la más reciente que ya empezó (RN-07). Si un destino no
 // tiene tarifa propia para un inductor, rige la del destino GENERAL.
 
+const { tieneMaximoDosDecimales } = require('./hojasUtils');
+
 const INDUCTORES = ['PASAJE', 'NOCHE', 'ALIMENTACION', 'JORNADA'];
 const DESTINO_GENERAL = 'GENERAL';
 const MONTO_MAXIMO = 100000;
@@ -47,6 +49,7 @@ function validarTarifa({ inductor, destino, monto, vigenteDesde } = {}, destinos
   if (typeof valor !== 'number' || !Number.isFinite(valor) || valor <= 0 || valor > MONTO_MAXIMO) {
     return { error: `Ingrese un monto mayor a 0 y hasta ${MONTO_MAXIMO}` };
   }
+  if (!tieneMaximoDosDecimales(valor)) return { error: 'El monto solo puede tener hasta 2 decimales (por ejemplo, 182.00)' };
 
   if (!esFechaISOValida(vigenteDesde)) return { error: 'Ingrese una fecha de vigencia válida' };
 

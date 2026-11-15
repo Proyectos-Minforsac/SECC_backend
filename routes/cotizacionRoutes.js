@@ -6,6 +6,7 @@ const {
   getCotizacion,
   getCotizacionParaEdicion,
   getCotizacionesPorSolicitud,
+  getSolicitudesCotizadas,
   updateEstadoCotizacion,
 } = require('../controllers/cotizacionController');
 const { exigirRol } = require('../services/autorizacion');
@@ -24,6 +25,12 @@ router.get('/cotizaciones', (req, res) => {
 router.get('/cotizaciones/solicitud/:solicitudId', (req, res) => {
   console.log('Ruta GET /cotizaciones/solicitud/:solicitudId ejecutada');
   getCotizacionesPorSolicitud(req, res);
+});
+
+// Antes que '/cotizaciones/:id', que de otro modo la tomaría por un id
+router.get('/cotizaciones/solicitudes-cotizadas', (req, res) => {
+  console.log('Ruta GET /cotizaciones/solicitudes-cotizadas ejecutada');
+  getSolicitudesCotizadas(req, res);
 });
 
 router.get('/cotizaciones/:id/edicion', (req, res) => {

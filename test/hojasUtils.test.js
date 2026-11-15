@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { borrarFilas } = require('../services/hojasUtils');
+const { borrarFilas, tieneMaximoDosDecimales } = require('../services/hojasUtils');
 
 // Hoja que anota los rangos que se le piden borrar (índices desde 0, final excluido, como la API de Sheets)
 const hojaQueAnota = () => {
@@ -36,4 +36,9 @@ test('borrarFilas: ignora repetidas y no hace nada sin filas', async () => {
   const vacia = hojaQueAnota();
   await borrarFilas(vacia, []);
   assert.deepEqual(vacia.rangos, []);
+});
+
+test('tieneMaximoDosDecimales: 182, 182.5 y 182.50 sí; 182.555 y lo que no es número, no', () => {
+  for (const bueno of [0, 182, 182.5, 182.55, 0.01, 1234567.89, Number('182.00')]) assert.equal(tieneMaximoDosDecimales(bueno), true, String(bueno));
+  for (const malo of [182.555, 0.001, 0.005, NaN, Infinity, undefined, null]) assert.equal(tieneMaximoDosDecimales(malo), false, String(malo));
 });

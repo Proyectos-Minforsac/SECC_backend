@@ -7,10 +7,10 @@ const validacionModel = require('./validacionModel');
 
 const IGV_RATE = 0.18;
 
-// Un ítem es "Título" si viene marcado o si cantidad y precio son 0
+// Solo es "Título" el ítem de una cotización anterior que ya venía marcado así; un ítem vacío ya no se convierte en título
+// (el controlador lo rechaza antes).
 function esTitulo(item) {
-  if (item.tipo === 'Título') return true;
-  return Number(item.cantidad) === 0 && Number(item.precioUnitario) === 0;
+  return item.tipo === 'Título';
 }
 
 function generarNumeroCotizacion(cotizacionId) {
@@ -529,6 +529,20 @@ async function cotizacionesParaPdf(filtro) {
  * Cotizaciones ligadas a una solicitud de servicio, con cliente e ítems. Sirve para rearmar el PDF de cada
  * cotización al cerrar el servicio. Las que el jefe aún no validó (o devolvió) no se entregaron al cliente: no se incluyen.
  */
+/**
+ * Ids de las solicitudes que ya tienen una cotización, en cualquier estado (en revisión, validada, devuelta, aceptada o
+ * rechazada). Sirve para no ofrecer "Crear cotización" otra vez desde el aviso del diagnóstico.
+ */
+async function getSolicitudesCotizadas() {
+  const hoja = (await conectar()).sheetsByTitle['cotizaciones'];
+  if (!hoja) throw new Error("Falta la hoja 'cotizaciones'");
+
+  const ids = (await hoja.getRows())
+    .map((fila) => Number(texto(fila.get('solicitudId'))))
+    .filter((id) => Number.isInteger(id) && id > 0);
+  return [...new Set(ids)];
+}
+
 async function getCotizacionesPorSolicitud(solicitudId) {
   const cotizaciones = await cotizacionesParaPdf((c) => String(c.solicitudId ?? '') === String(solicitudId));
   if (cotizaciones.length === 0) return [];
@@ -637,6 +651,7 @@ module.exports = {
   editarCotizacionDevuelta,
   getAllCotizaciones,
   getCotizacionesPorSolicitud,
+  getSolicitudesCotizadas,
   getCotizacionPorId,
   getCotizacionParaEdicion,
   updateEstadoCotizacion,

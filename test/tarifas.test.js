@@ -42,11 +42,13 @@ test('esFechaISOValida rechaza fechas imposibles y otros formatos', () => {
 
 test('validarTarifa normaliza lo válido', () => {
   const { datos, error } = validarTarifa(
-    { inductor: 'NOCHE', destino: 'arequipa', monto: '85,555', vigenteDesde: '2026-11-05' },
+    { inductor: 'NOCHE', destino: 'arequipa', monto: '85,55', vigenteDesde: '2026-11-05' },
     ['GENERAL', 'Arequipa']
   );
   assert.equal(error, undefined);
-  assert.deepEqual(datos, { inductor: 'NOCHE', destino: 'Arequipa', monto: 85.56, vigenteDesde: '2026-11-05' });
+  assert.deepEqual(datos, { inductor: 'NOCHE', destino: 'Arequipa', monto: 85.55, vigenteDesde: '2026-11-05' });
+  // Más de 2 decimales no se redondea en silencio: se rechaza
+  assert.match(validarTarifa({ inductor: 'NOCHE', destino: 'GENERAL', monto: '85,555', vigenteDesde: '2026-11-05' }).error, /2 decimales/);
 });
 
 test('validarTarifa rechaza datos incompletos o inválidos', () => {

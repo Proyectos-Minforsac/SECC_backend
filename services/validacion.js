@@ -7,7 +7,7 @@
 // Si el jefe crea la cotización, nace VALIDADA (con el mismo requisito de justificación).
 // Cada paso se anota en la bitácora; las cotizaciones sin estimación (anteriores a este control) quedan exentas.
 
-const { errorHttp, texto } = require('./hojasUtils');
+const { errorHttp, texto, tieneMaximoDosDecimales } = require('./hojasUtils');
 const { calcularMargen, redondear } = require('./calculoCostos');
 
 const ESTADO = {
@@ -93,6 +93,9 @@ function decidir(accion, estimacion, margenMinimo, datos = {}) {
     const costoNuevo = Number(datos.costoNuevo);
     if (texto(datos.costoNuevo) === '' || !Number.isFinite(costoNuevo) || costoNuevo <= 0 || costoNuevo > COSTO_MAXIMO) {
       throw errorHttp(400, 'Ingresa el costo total ajustado (un monto mayor que cero)');
+    }
+    if (!tieneMaximoDosDecimales(costoNuevo)) {
+      throw errorHttp(400, 'El costo total ajustado solo puede tener hasta 2 decimales (por ejemplo, 182.00)');
     }
     const costoDespues = redondear(costoNuevo);
     if (costoDespues === costoAntes) {

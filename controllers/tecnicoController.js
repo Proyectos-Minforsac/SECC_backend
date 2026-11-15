@@ -1,4 +1,5 @@
 const tecnicoModel = require('../models/tecnicoModel');
+const { tieneMaximoDosDecimales } = require('../services/hojasUtils');
 
 // Valida y normaliza los precios de aire. Devuelve { error } o { precios }.
 // Un precio en 0 no se registra: solo se conservan los mayores a 0.
@@ -14,6 +15,9 @@ function normalizarPreciosAire(servicio, precios) {
   );
   if (invalido) {
     return { error: 'Los precios de aire condicionado no son válidos' };
+  }
+  if (entrada.some(p => !tieneMaximoDosDecimales(Number(p.precio)))) {
+    return { error: 'Los precios de aire condicionado solo pueden tener hasta 2 decimales' };
   }
 
   const normalizados = entrada

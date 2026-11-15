@@ -64,8 +64,9 @@ function leerEntero(valor, max) {
   return Number.isInteger(numero) && numero >= 0 && numero <= max ? numero : null;
 }
 
-// Mismo criterio que la cotización: un ítem es "Título" si viene marcado o si cantidad y precio son 0.
-const esTitulo = item => item.tipo === 'Título' || (Number(item.cantidad) === 0 && Number(item.precioUnitario) === 0);
+// Solo es "Título" el ítem que ya venía guardado así (cotizaciones anteriores): un ítem sin cantidad ni precio ya no se
+// convierte en título, simplemente no se acepta (ver el controlador de cotizaciones).
+const esTitulo = item => item.tipo === 'Título';
 
 // Lo ingresado por actividad, limpio (enteros; 0 donde falte). Es lo que se guarda como las "entradas" de la estimación.
 function normalizarActividades(actividades) {
@@ -146,6 +147,10 @@ function costoDeItem(item, problemas) {
   const costo = Number(crudo);
   if (!Number.isFinite(costo) || costo < 0 || costo > COSTO_ITEM_MAXIMO) {
     problemas.push(`El costo de compra del ítem «${nombre}» no es válido`);
+    return null;
+  }
+  if (Math.abs(Math.round(costo * 100) - costo * 100) > 1e-7) {
+    problemas.push(`El costo de compra del ítem «${nombre}» solo puede tener hasta 2 decimales`);
     return null;
   }
   const costoUnitario = redondear(costo);

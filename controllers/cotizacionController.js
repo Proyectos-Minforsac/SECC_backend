@@ -1,5 +1,6 @@
 const cotizacionModel = require('../models/cotizacionModel');
 const clienteModel = require('../models/clienteModel');
+const { validarItems } = require('../services/items');
 const {
   GARANTIA_MESES_MIN,
   GARANTIA_MESES_MAX,
@@ -9,11 +10,6 @@ const {
 
 // Decisiones posibles sobre una cotización pendiente (PENDIENTE es solo el estado inicial)
 const ESTADOS_DECISION = ['ACEPTADA', 'RECHAZADA'];
-
-function esItemTitulo(it) {
-  const precio = it.precioUnitario ?? it.precio;
-  return it.tipo === 'Título' || (Number(it.cantidad) === 0 && Number(precio) === 0);
-}
 
 // Los errores con status (400, 404, 409...) son de negocio, como una tarifa que falta o una cotización sin validar, y su
 // mensaje es seguro de mostrar.
@@ -37,42 +33,15 @@ function leerCuerpo({ garantiaMeses, items, estimacion }) {
     };
   }
 
-  if (!Array.isArray(items) || items.length === 0) {
-    return { error: 'La cotización debe tener al menos un ítem' };
-  }
-
-  // Validación por ítem
-  for (const [i, it] of items.entries()) {
-    if (!it || typeof it.nombre !== 'string' || !it.nombre.trim()) {
-      return { error: `El ítem #${i + 1} no tiene nombre` };
-    }
-    if (!esItemTitulo(it) && !it.tipo) {
-      return { error: `El ítem "${it.nombre}" no tiene tipo` };
-    }
-    if (it.tipo === 'Impresora' && !it.detalleImpresora) {
-      return { error: `El ítem "${it.nombre}" es Impresora pero no trae detalles` };
-    }
-  }
+  const { error, items: itemsNormalizados } = validarItems(items);
+  if (error) return { error };
 
   // La estimación de costos es obligatoria; su contenido lo valida el modelo al calcularla.
   if (!estimacion || typeof estimacion !== 'object') {
     return { error: 'Falta la estimación de costos de la cotización' };
   }
 
-  // Normalizamos: aceptamos precio o precioUnitario desde el front
-  return {
-    items: items.map((it, i) => ({
-      tipo: it.tipo,
-      nombre: it.nombre.trim(),
-      descripcion: it.descripcion || '',
-      cantidad: Number(it.cantidad) || 0,
-      precioUnitario: Number(it.precioUnitario ?? it.precio) || 0,
-      // Costo de compra (uso interno). Si falta se deja como está: el modelo decide si ese ítem lo necesita.
-      costoUnitario: it.costoUnitario ?? null,
-      orden: Number.isInteger(it.orden) ? it.orden : i,
-      detalleImpresora: it.detalleImpresora || null,
-    })),
-  };
+  return { items: itemsNormalizados };
 }
 
 async function createCotizacion(req, res) {
@@ -194,6 +163,15 @@ async function getCotizacionesPorSolicitud(req, res) {
   }
 }
 
+async function getSolicitudesCotizadas(req, res) {
+  console.log('Controlador: GET /cotizaciones/solicitudes-cotizadas');
+  try {
+    res.status(200).json(await cotizacionModel.getSolicitudesCotizadas());
+  } catch (error) {
+    responderError(res, 'Error al obtener las solicitudes cotizadas', error);
+  }
+}
+
 // Una cotización para su PDF. Solo si el jefe la validó (o es anterior al control de costos).
 async function getCotizacion(req, res) {
   console.log('Controlador: GET /cotizaciones/:id');
@@ -260,5 +238,6 @@ module.exports = {
   getCotizacion,
   getCotizacionParaEdicion,
   getCotizacionesPorSolicitud,
+  getSolicitudesCotizadas,
   updateEstadoCotizacion,
 };

@@ -81,6 +81,8 @@ test('ajustar rechaza costos que no sirven', () => {
   // Igual al estimado: no hay nada que ajustar
   falla(() => decidir(ACCION.AJUSTAR, enRevision(), 20, datos(3376.5)), 400, /usa Validar/);
   falla(() => decidir(ACCION.AJUSTAR, enRevision(), 20, datos('3376.50')), 400, /usa Validar/);
+  // Un monto lleva como máximo 2 decimales
+  falla(() => decidir(ACCION.AJUSTAR, enRevision(), 20, datos('3000.555')), 400, /2 decimales/);
 });
 
 test('ajustar sobre una cotización sin venta deja el margen sin calcular', () => {

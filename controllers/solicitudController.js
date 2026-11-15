@@ -1,5 +1,6 @@
 const solicitudModel = require('../models/solicitudModel');
 const driveService = require('../services/driveService');
+const { tieneMaximoDosDecimales } = require('../services/hojasUtils');
 
 const EXTENSIONES_OFERTA = /\.(pdf|doc|docx)$/i;
 // El cuerpo JSON admite 12 MB (app.js) y base64 pesa un tercio más que el archivo.
@@ -102,6 +103,9 @@ async function enviarOferta(req, res) {
     const monto = Number(montoVisita);
     if (!Number.isFinite(monto) || monto <= 0) {
       return res.status(400).json({ message: 'Ingrese un monto válido para la visita' });
+    }
+    if (!tieneMaximoDosDecimales(monto)) {
+      return res.status(400).json({ message: 'El monto de la visita solo puede tener hasta 2 decimales (por ejemplo, 182.00)' });
     }
 
     let archivo = null;

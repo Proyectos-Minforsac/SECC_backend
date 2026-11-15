@@ -207,18 +207,19 @@ test('materiales: Producto e Impresora exigen costo; Alquiler es opcional; Servi
     { tipo: 'Alquiler', nombre: 'Andamio', cantidad: 1, precioUnitario: 100 },
     { tipo: 'Servicio', nombre: 'Instalación', cantidad: 1, precioUnitario: 300, costoUnitario: 999 },
     { tipo: 'Título', nombre: 'Sección', cantidad: 0, precioUnitario: 0 },
-    { tipo: 'Producto', nombre: 'Marcado como 0', cantidad: 0, precioUnitario: 0 },
+    { tipo: 'Producto', nombre: 'Sin cantidad ni precio', cantidad: 0, precioUnitario: 0 },
   ];
   const { resultado: r, problemas } = calcularEstimacion({ actividades: SIN_ACTIVIDADES, tarifas: TARIFAS, items, ventaSinIGV: 100 });
 
   assert.ok(problemas.some(p => p.includes('«Split»') && p.includes('costo de compra')));
-  assert.equal(problemas.filter(p => p.includes('necesita su costo')).length, 1);
+  // Un ítem con cantidad y precio 0 ya no se toma por título: como cualquier producto, necesita su costo de compra
+  assert.equal(problemas.filter(p => p.includes('necesita su costo')).length, 2);
   assert.equal(r.costosItems[0], null);
   assert.deepEqual(r.costosItems[1], { costoUnitario: 500, costoSubtotal: 1000 });
   assert.deepEqual(r.costosItems[2], { costoUnitario: null, costoSubtotal: 0 });
   assert.equal(r.costosItems[3], null, 'el servicio ignora el costo que le envíen');
   assert.equal(r.costosItems[4], null);
-  assert.equal(r.costosItems[5], null, 'cantidad y precio 0 = título');
+  assert.equal(r.costosItems[5], null, 'sin su costo de compra no hay costo');
   assert.equal(r.materiales, 1000);
 });
 
@@ -266,4 +267,10 @@ test('normalizarActividades deja enteros y 0 donde falte o sea inválido', () =>
       SOPORTE: { nTecnicos: 0, visitas: 0, diasPorVisita: 0, nochesPorVisita: 0 },
     }
   );
+});
+
+test('materiales: el costo de compra lleva como máximo 2 decimales', () => {
+  const items = [producto(undefined, 1, { nombre: 'Split', costoUnitario: 10.555 })];
+  const { problemas } = calcularEstimacion({ actividades: SIN_ACTIVIDADES, tarifas: TARIFAS, items, ventaSinIGV: 100 });
+  assert.ok(problemas.some(p => p.includes('«Split»') && p.includes('2 decimales')));
 });

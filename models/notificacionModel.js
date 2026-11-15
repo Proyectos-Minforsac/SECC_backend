@@ -1,5 +1,5 @@
 const { conectar } = require('../services/sheetsService');
-const { errorHttp, texto, mismoId, normalizar, siguienteId, exigirColumnas } = require('../services/hojasUtils');
+const { errorHttp, texto, mismoId, normalizar, siguienteId } = require('../services/hojasUtils');
 
 const ROLES = ['trabajador', 'jefe', 'tecnico'];
 // Notificaciones que además de mostrarse habilitan una acción rápida (p.ej. "Crear cotización"). Son las que el
@@ -77,8 +77,13 @@ async function crearNotificacion({ rolDestino, tecnicoDestino, tipo, mensaje, so
     if (existente) return armarNotificacion(existente);
   }
 
-  // Sin la columna el aviso se crearía sin su enlace y el botón no sabría adónde ir
-  if (cotizacionId) exigirColumnas(hoja, ['cotizacionId'], 'notificaciones');
+  // El enlace a la cotización necesita la columna `cotizacionId` (se agrega con npm run hojas:preparar). Si la hoja aún no la
+  // tiene, el aviso se crea igual, sin enlace: es mejor que el jefe se entere a que el aviso se pierda en silencio.
+  let enlazar = Boolean(cotizacionId);
+  if (enlazar && !(hoja.headerValues || []).includes('cotizacionId')) {
+    console.warn("Notificación: la hoja 'notificaciones' no tiene la columna cotizacionId; el aviso se crea sin enlace (npm run hojas:preparar la agrega)");
+    enlazar = false;
+  }
 
   const nueva = await hoja.addRow({
     notificacionId: siguienteId(filas, 'notificacionId'),
@@ -90,7 +95,7 @@ async function crearNotificacion({ rolDestino, tecnicoDestino, tipo, mensaje, so
     leida: 'FALSE',
     solicitudId: solicitudId ?? '',
     clave: clave || '',
-    ...(cotizacionId ? { cotizacionId } : {}),
+    ...(enlazar ? { cotizacionId } : {}),
   }, { raw: true });
 
   return armarNotificacion(nueva);

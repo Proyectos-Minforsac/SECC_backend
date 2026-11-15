@@ -61,6 +61,11 @@ function exigirColumnas(hoja, columnas, nombreHoja) {
   }
 }
 
+// Los montos (soles o dólares) llevan como máximo 2 decimales: 182, 182.5 y 182.50 sí; 182.555 no.
+function tieneMaximoDosDecimales(numero) {
+  return Number.isFinite(numero) && Math.abs(Math.round(numero * 100) - numero * 100) < 1e-7;
+}
+
 function siguienteId(filas, campo) {
   const ids = filas.map(f => parseInt(f.get(campo), 10)).filter(Number.isInteger);
   return (ids.length ? Math.max(...ids) : 0) + 1;
@@ -93,6 +98,7 @@ module.exports = {
   hoyISO,
   cargarEncabezados,
   exigirColumnas,
+  tieneMaximoDosDecimales,
   siguienteId,
   borrarFilas,
 };

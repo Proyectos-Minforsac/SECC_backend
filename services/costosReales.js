@@ -8,7 +8,7 @@
 // Al cerrar el servicio se compara lo real con lo estimado y validado:
 //   ΔC = Creal − Cest        ΔM = Mreal − Mest (en puntos de margen)
 
-const { errorHttp, texto } = require('./hojasUtils');
+const { errorHttp, texto, tieneMaximoDosDecimales } = require('./hojasUtils');
 const { RUBROS, CAMPOS, redondear, calcularMargen, unidadesDe } = require('./calculoCostos');
 const { aNumeroONulo, leerTexto } = require('./validacion');
 
@@ -242,6 +242,10 @@ function leerEntradas(etapa, enviada, problemas) {
       problemas.push(`${nombre}: ${descripcion} no es válido`);
       return 0;
     }
+    if (!tieneMaximoDosDecimales(n)) {
+      problemas.push(`${nombre}: ${descripcion} solo puede tener hasta 2 decimales`);
+      return 0;
+    }
     return n;
   };
 
@@ -297,6 +301,7 @@ function validarMonto(valor) {
   if (texto(valor) === '' || !Number.isFinite(n) || n <= 0 || n > MONTO_MAXIMO) {
     throw errorHttp(400, 'Ingresa el monto del imprevisto (un monto mayor que cero)');
   }
+  if (!tieneMaximoDosDecimales(n)) throw errorHttp(400, 'El monto del imprevisto solo puede tener hasta 2 decimales (por ejemplo, 182.00)');
   return redondear(n);
 }
 

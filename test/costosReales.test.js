@@ -182,6 +182,9 @@ test('validarLiquidacion: rechaza lo que no cuadra', () => {
   falla(() => validarLiquidacion(esperadas, [instalacionEnviada({ materiales: -5 })], 300), 400, /materiales no es válido/);
   falla(() => validarLiquidacion(esperadas, [instalacionEnviada({ precios: { TRANSPORTE: 60 } })], 300), 400, /precio de la noche de hospedaje/);
   falla(() => validarLiquidacion(esperadas, [instalacionEnviada({ precios: { ...instalacionEnviada().precios, MANO_OBRA: 'caro' } })], 300), 400, /precio de la jornada/);
+  // Los montos llevan como máximo 2 decimales
+  falla(() => validarLiquidacion(esperadas, [instalacionEnviada({ precios: { ...instalacionEnviada().precios, MANO_OBRA: 120.555 } })], 300), 400, /precio de la jornada.*2 decimales/);
+  falla(() => validarLiquidacion(esperadas, [instalacionEnviada({ materiales: 99.999 })], 300), 400, /materiales solo puede tener hasta 2 decimales/);
 });
 
 test('validarLiquidacion: sin unidades en un rubro su precio puede faltar', () => {
@@ -197,13 +200,14 @@ test('validarLiquidacion: sin unidades en un rubro su precio puede faltar', () =
 });
 
 test('validarImprevisto: etapa, tipo, monto y motivo', () => {
-  const ok = validarImprevisto({ etapa: 'INSTALACION', concepto: 'DOBLE_PASAJE', monto: '120.456', motivo: '  El cliente no abrió; hubo que volver.  ' });
-  assert.deepEqual(ok, { etapa: 'INSTALACION', concepto: 'DOBLE_PASAJE', monto: 120.46, motivo: 'El cliente no abrió; hubo que volver.' });
+  const ok = validarImprevisto({ etapa: 'INSTALACION', concepto: 'DOBLE_PASAJE', monto: '120.45', motivo: '  El cliente no abrió; hubo que volver.  ' });
+  assert.deepEqual(ok, { etapa: 'INSTALACION', concepto: 'DOBLE_PASAJE', monto: 120.45, motivo: 'El cliente no abrió; hubo que volver.' });
 
   const base = { etapa: 'SOPORTE', concepto: 'OTRO', monto: 50, motivo: 'Motivo suficientemente largo.' };
   falla(() => validarImprevisto({ ...base, etapa: 'OTRA' }), 400, /etapa/);
   falla(() => validarImprevisto({ ...base, concepto: 'ROBO' }), 400, /tipo de imprevisto/);
   for (const malo of ['', 0, -3, 'abc', 2e7, null]) falla(() => validarImprevisto({ ...base, monto: malo }), 400, /monto/);
+  falla(() => validarImprevisto({ ...base, monto: '120.456' }), 400, /2 decimales/);
   falla(() => validarImprevisto({ ...base, motivo: '' }), 400, /Motivo/);
   falla(() => validarImprevisto({ ...base, motivo: 'corto' }), 400, /al menos 10/);
 });

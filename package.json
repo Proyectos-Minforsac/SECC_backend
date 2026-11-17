@@ -9,7 +9,9 @@
     "drive:token": "node scripts/obtenerTokenDrive.js",
     "visitas:pendientes": "node scripts/crearVisitasPendientes.js",
     "hojas:preparar": "node scripts/prepararHojas.js",
-    "historico:importar": "node scripts/importarHistorico.js"
+    "historico:importar": "node scripts/importarHistorico.js",
+    "servicios:borrar": "node scripts/borrarServicios.js",
+    "servicios:ejemplo": "node scripts/agregarEjemplos.js"
   },
   "keywords": [],
   "author": "",

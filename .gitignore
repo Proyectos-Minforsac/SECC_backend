@@ -24,3 +24,5 @@ dist-ssr
 *.sw?
 .env
 .env.example
+# Respaldos de la limpieza de servicios (datos reales de clientes)
+respaldos/

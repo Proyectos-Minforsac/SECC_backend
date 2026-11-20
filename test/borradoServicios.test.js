@@ -37,6 +37,11 @@ test('repartirFilas: todo se borra salvo lo que la hoja manda conservar (los his
   const otra = repartirFilas({ titulo: 'ofertas' }, filas);
   assert.equal(otra.borrar.length, 4);
   assert.equal(otra.conservadas.length, 0);
+
+  // Con incluirHistoricos también se borran los históricos
+  const todo = repartirFilas(resumen, filas, { incluirHistoricos: true });
+  assert.equal(todo.borrar.length, 4);
+  assert.equal(todo.conservadas.length, 0);
 });
 
 test('aCsv: comillas, separadores y saltos de línea no rompen el archivo', () => {

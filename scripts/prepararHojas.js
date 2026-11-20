@@ -3,7 +3,7 @@
 // "garantiaMeses" de cotizaciones, "costoUnitario" y "costoSubtotal" de itemsCotizacion, las columnas de la estimación
 // de inductoresCosto, "cotizacionId" de notificaciones, "liquidacionInstalacionEn" y "liquidacionFinalEn" de visitasTecnicas
 // "referencia" de resumenProceso y las hojas "notificaciones", "tarifario", "parametrosCosto", "estimacionesCosto",
-// "ajustesCosto", "costosReales" y "resumenProceso".
+// "ajustesCosto", "costosReales", "resumenProceso" y "evidencias".
 // Es seguro repetirlo: lo que ya existe se deja como está y nunca se tocan las filas de datos.
 //   npm run hojas:preparar
 const { conectar } = require('../services/sheetsService');
@@ -149,6 +149,18 @@ const HOJAS_NUEVAS = {
     'cerradoEn',
     // Nombre con el que se reconoce el servicio: el cliente en los del sistema, la referencia del Excel en los históricos
     'referencia',
+  ],
+  // Imágenes, PDF y documentos Word que el técnico adjunta al diagnóstico o al avance de una visita. El archivo vive en Drive.
+  evidencias: [
+    'evidenciaId',
+    'visitaId',
+    'visitaProgramadaId',
+    'ambito',
+    'nombre',
+    'tipo',
+    'archivoId',
+    'subidoPor',
+    'subidoEn',
   ],
   // Solo se crea si no existía (en ese caso ya tenía estas 7 columnas); las nuevas se agregan arriba.
   inductoresCosto: [

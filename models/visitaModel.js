@@ -10,6 +10,7 @@ const {
   siguienteId,
 } = require('../services/hojasUtils');
 const { garantiaGuardada, esGarantiaValida } = require('../services/garantia');
+const { AMBITO, evidenciasDe } = require('../services/evidencias');
 const parametroCostoModel = require('./parametroCostoModel');
 const costoRealModel = require('./costoRealModel');
 
@@ -49,18 +50,22 @@ async function cargarDatos() {
   const faltante = Object.entries(hojas).find(([, hoja]) => !hoja);
   if (faltante) throw new Error(`No existe la hoja "${faltante[0]}" en el Excel`);
 
-  const [visitas, programadas, solicitudes, ofertas, clientes, tecnicos, parametros] = await Promise.all([
+  // La hoja de evidencias es opcional: sin ella (el Excel aún no se preparó) las visitas salen sin archivos
+  const hojaEvidencias = doc.sheetsByTitle['evidencias'];
+
+  const [visitas, programadas, solicitudes, ofertas, clientes, tecnicos, evidencias, parametros] = await Promise.all([
     hojas.visitas.getRows(),
     hojas.programadas.getRows(),
     hojas.solicitudes.getRows(),
     hojas.ofertas.getRows(),
     hojas.clientes.getRows(),
     hojas.tecnicos.getRows(),
+    hojaEvidencias ? hojaEvidencias.getRows() : [],
     // Parámetros que fija el jefe (aquí solo importa la garantía por defecto).
     parametroCostoModel.getValores(),
   ]);
 
-  return { hojas, filas: { visitas, programadas, solicitudes, ofertas, clientes, tecnicos }, parametros };
+  return { hojas, filas: { visitas, programadas, solicitudes, ofertas, clientes, tecnicos, evidencias }, parametros };
 }
 
 // Etapas que el trabajador ya finalizó (0 si la columna está vacía). Solo la instalación se finaliza, así que
@@ -108,8 +113,7 @@ function armarVisitas({ filas, parametros }, soloId) {
             .split(SEPARADOR_COMPONENTES)
             .map(texto)
             .filter(Boolean),
-          // Las evidencias (imágenes y documentos) todavía no se guardan en el backend.
-          evidencias: [],
+          evidencias: evidenciasDe(filas.evidencias, { ambito: AMBITO.DIAGNOSTICO, visitaId: f.get('visitaId') }),
         };
       }
 
@@ -133,7 +137,7 @@ function armarVisitas({ filas, parametros }, soloId) {
     .sort((a, b) => b.visitaId - a.visitaId);
 }
 
-function armarProgramada(fila) {
+function armarProgramada(fila, filasEvidencias = []) {
   const programada = {
     visitaProgramadaId: Number(texto(fila.get('visitaProgramadaId'))),
     visitaId: Number(texto(fila.get('visitaId'))),
@@ -145,13 +149,20 @@ function armarProgramada(fila) {
   };
 
   if (texto(fila.get('completadaEn'))) {
-    programada.avance = { descripcion: texto(fila.get('avanceDescripcion')), evidencias: [] };
+    programada.avance = {
+      descripcion: texto(fila.get('avanceDescripcion')),
+      evidencias: evidenciasDe(filasEvidencias, {
+        ambito: AMBITO.AVANCE,
+        visitaId: fila.get('visitaId'),
+        visitaProgramadaId: fila.get('visitaProgramadaId'),
+      }),
+    };
   }
 
   return programada;
 }
 
-const armarProgramadas = ({ filas }) => filas.programadas.map(armarProgramada);
+const armarProgramadas = ({ filas }) => filas.programadas.map(fila => armarProgramada(fila, filas.evidencias));
 
 const clave = fila => `${aISO(fila.get('fecha'))}${aHora(fila.get('horaInicio'))}`;
 
@@ -445,7 +456,7 @@ async function registrarAvance(visitaProgramadaId, { descripcion, imprevisto }) 
   fila.set('completadaEn', new Date().toISOString());
   await fila.save({ raw: true });
 
-  return armarProgramada(fila);
+  return armarProgramada(fila, datos.filas.evidencias);
 }
 
 // El trabajador da por terminada la instalación (sin importar cuántas visitas tuvo) y habilita a la vez el

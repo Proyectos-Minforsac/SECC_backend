@@ -53,7 +53,7 @@ const TIPO_CAMBIO_MAXIMO = 100;
 
 const redondear = numero => Math.round((numero + Number.EPSILON) * 100) / 100;
 
-// Margen (RN-01): (venta - costo) / venta × 100, ambos en soles y sin IGV. Sin venta no hay con qué compararlo: null.
+// Margen (RN-01): (venta - costo) / venta × 100, ambos en soles y sin IGV.
 const calcularMargen = (ventaSoles, costoTotal) =>
   ventaSoles > 0 ? redondear(((ventaSoles - costoTotal) / ventaSoles) * 100) : null;
 
@@ -121,7 +121,8 @@ function expandirActividad(etapa, datos, problemas) {
   };
 }
 
-// Unidades que se cobran en cada rubro: pasajes, noches de hospedaje, días de alimentación, jornadas.
+// Unidades que se cobran en cada rubro:
+// pasajes, noches de hospedaje, días de alimentación, jornadas.
 const unidadesDe = (campo, a) => {
   if (campo === 'transporte') return a.nTecnicos * a.viajes;
   if (campo === 'hospedaje') return a.nTecnicos * a.noches;
@@ -189,6 +190,7 @@ function calcularEstimacion({
   for (const etapa of ACTIVIDADES) {
     const actividad = { ...expandirActividad(etapa, actividades?.[etapa], problemas) };
 
+    // Extracto de calcularEstimacion: por cada actividad y cada rubro
     for (const rubro of RUBROS) {
       const cantidad = unidadesDe(rubro.campo, actividad);
       actividad[rubro.campo] = 0;
@@ -202,6 +204,7 @@ function calcularEstimacion({
 
       const subtotal = redondear(cantidad * tarifa.monto);
       actividad[rubro.campo] = subtotal;
+
       tarifasUsadas[rubro.inductor] = {
         tarifaId: tarifa.tarifaId,
         monto: tarifa.monto,

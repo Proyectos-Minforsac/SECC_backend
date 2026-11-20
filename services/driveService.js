@@ -189,6 +189,22 @@ async function moverArchivo(archivoId, carpetaDestinoId) {
   });
 }
 
+// Manda un archivo a la papelera de Drive (recuperable). Solo si está dentro de la carpeta del sistema.
+async function enviarArchivoAPapelera(archivoId) {
+  const { parents = [] } = await solicitar({
+    url: `${API}/files/${archivoId}`,
+    params: { supportsAllDrives: true, fields: 'parents' },
+  });
+  await Promise.all(parents.map(verificarCarpeta));
+
+  await solicitar({
+    url: `${API}/files/${archivoId}`,
+    method: 'PATCH',
+    params: { supportsAllDrives: true, fields: 'id' },
+    data: { trashed: true },
+  });
+}
+
 // Devuelve el archivo como stream junto con su nombre y tipo. Quien llame debe haber validado
 // que el id salió de la base de datos: aquí no se comprueba la carpeta de origen.
 async function descargarArchivo(archivoId) {
@@ -210,5 +226,6 @@ module.exports = {
   enviarCarpetaAPapelera,
   subirArchivo,
   moverArchivo,
+  enviarArchivoAPapelera,
   descargarArchivo,
 };

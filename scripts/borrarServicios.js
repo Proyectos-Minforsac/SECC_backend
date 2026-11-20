@@ -8,6 +8,9 @@
 //   npm run servicios:borrar -- --confirmar  guarda un respaldo en CSV y borra (pide escribir el nombre del libro)
 //   npm run servicios:borrar -- --confirmar --nombre="Nombre del libro"   lo mismo sin teclado: el nombre hace de confirmación
 //
+//   --incluir-historicos   borra también los servicios históricos (resumenProceso con origen HISTORICO), p. ej. para
+//                          reemplazarlos por históricos reales. Se puede combinar con --confirmar.
+//
 // Antes de borrar siempre se guarda un respaldo de cada hoja en respaldos/AAAA-MM-DD_HHMM/. Si el respaldo falla, no se borra
 // nada. Con el servidor encendido, reinícialo después: guarda las filas en memoria unos segundos.
 const fs = require('fs');
@@ -17,7 +20,7 @@ const { HOJAS_DE_SERVICIOS, HOJAS_CONSERVADAS, repartirFilas, aCsv, nombreDeResp
 const { borrarFilas } = require('../services/hojasUtils');
 
 // Lee cada hoja y reparte sus filas entre las que se borran y las que se conservan.
-async function planificar(doc) {
+async function planificar(doc, opciones = {}) {
   const plan = [];
   for (const definicion of HOJAS_DE_SERVICIOS) {
     const hoja = doc.sheetsByTitle[definicion.titulo];
@@ -32,7 +35,7 @@ async function planificar(doc) {
       rowNumber: fila.rowNumber,
       datos: Object.fromEntries(encabezados.map(columna => [columna, fila.get(columna)])),
     }));
-    plan.push({ definicion, hoja, encabezados, filas, ...repartirFilas(definicion, filas) });
+    plan.push({ definicion, hoja, encabezados, filas, ...repartirFilas(definicion, filas, opciones) });
   }
   return plan;
 }
@@ -69,8 +72,8 @@ function guardarRespaldo(plan, carpetaBase, ahora) {
 }
 
 // `preguntar(texto)` devuelve lo que escribe la persona; se recibe como parámetro para poder probar el script sin teclado.
-async function ejecutar({ doc, confirmado, preguntar, carpetaBase, ahora = new Date(), log = console.log }) {
-  const plan = await planificar(doc);
+async function ejecutar({ doc, confirmado, preguntar, carpetaBase, ahora = new Date(), log = console.log, incluirHistoricos = false }) {
+  const plan = await planificar(doc, { incluirHistoricos });
   mostrarPlan(plan, log);
 
   const aBorrar = plan.reduce((total, p) => total + p.borrar.length, 0);
@@ -79,7 +82,8 @@ async function ejecutar({ doc, confirmado, preguntar, carpetaBase, ahora = new D
     return { borradas: 0, respaldo: null };
   }
   if (!confirmado) {
-    log(`Simulacro: se borrarían ${aBorrar} filas. Para hacerlo: npm run servicios:borrar -- --confirmar`);
+    const opcion = incluirHistoricos ? ' --incluir-historicos' : '';
+    log(`Simulacro: se borrarían ${aBorrar} filas. Para hacerlo: npm run servicios:borrar -- --confirmar${opcion}`);
     return { borradas: 0, respaldo: null };
   }
 
@@ -128,7 +132,8 @@ if (require.main === module) {
         });
       });
 
-    await ejecutar({ doc, confirmado, preguntar, carpetaBase: path.resolve(__dirname, '../respaldos') });
+    const incluirHistoricos = process.argv.includes('--incluir-historicos');
+    await ejecutar({ doc, confirmado, preguntar, incluirHistoricos, carpetaBase: path.resolve(__dirname, '../respaldos') });
     process.exit(0);
   })().catch(error => {
     console.error(error);

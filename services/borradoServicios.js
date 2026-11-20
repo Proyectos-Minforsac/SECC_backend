@@ -24,6 +24,7 @@ const HOJAS_DE_SERVICIOS = [
   { titulo: 'ajustesCosto' },
   { titulo: 'costosReales' },
   { titulo: 'resumenProceso', conservar: esHistorico, queSeConserva: 'los servicios históricos (origen HISTORICO)' },
+  { titulo: 'evidencias' },
   { titulo: 'notificaciones' },
 ];
 
@@ -32,8 +33,9 @@ const HOJAS_CONSERVADAS = ['usuarios', 'clientes', 'tecnicos', 'preciosAire', 't
 
 // Reparte las filas de una hoja entre las que se borran y las que se conservan.
 //   filas: [{ rowNumber, datos }] con `datos` = objeto columna -> valor
-function repartirFilas(definicion, filas) {
-  const conservar = definicion.conservar ?? (() => false);
+//   incluirHistoricos: true borra también lo que la hoja conservaría (los servicios históricos)
+function repartirFilas(definicion, filas, { incluirHistoricos = false } = {}) {
+  const conservar = incluirHistoricos ? () => false : (definicion.conservar ?? (() => false));
   const borrar = [];
   const conservadas = [];
   for (const fila of filas) (conservar(fila.datos) ? conservadas : borrar).push(fila);

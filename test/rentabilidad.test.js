@@ -4,7 +4,7 @@ const { periodoDe, anioDe, filtrar, resumir, agruparPor, marcarServicios, compar
 
 // Un servicio cerrado con venta 4,800
 const caso = (extra = {}) => ({
-  origen: 'SISTEMA', referencia: 'R', tipoServicio: 'Aire Condicionado', destino: 'GENERAL', cerradoEn: '2026-06-15T10:00:00.000Z',
+  origen: 'SISTEMA', referencia: 'R', tipoServicio: 'Aire Acondicionado', destino: 'GENERAL', cerradoEn: '2026-06-15T10:00:00.000Z',
   ventaSoles: 4800, costoParametrico: 3000, costoAnalogo: null, costoEstimado: 3000, costoReal: 3600,
   imprevistosProvision: 150, imprevistosReal: 360, margenReal: 25, ...extra,
 });
@@ -74,7 +74,7 @@ test('agruparPor: un renglón por tipo o por mes, en orden', () => {
     caso({ cerradoEn: '2026-06-20' }),
   ];
   const porTipo = agruparPor(casos, c => c.tipoServicio);
-  assert.deepEqual(porTipo.map(g => [g.clave, g.servicios]), [['Aire Condicionado', 2], ['Cableado estructurado', 1]]);
+  assert.deepEqual(porTipo.map(g => [g.clave, g.servicios]), [['Aire Acondicionado', 2], ['Cableado estructurado', 1]]);
   assert.equal(porTipo[1].margenReal, 40);
   const porMes = agruparPor(casos, periodoDe);
   assert.deepEqual(porMes.map(g => [g.clave, g.servicios]), [['2026-06', 2], ['2026-07', 1]]);

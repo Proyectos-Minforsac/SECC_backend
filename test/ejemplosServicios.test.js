@@ -28,7 +28,7 @@ test('construirEjemplos: 5 servicios con referencia única, de dos tipos y cerra
   const ejemplos = construirEjemplos(hoy);
   assert.equal(ejemplos.length, 5);
   assert.equal(new Set(ejemplos.map(e => e.referencia)).size, 5);
-  assert.deepEqual([...new Set(ejemplos.map(e => e.tipoServicio))].sort(), ['Aire Condicionado', 'Cableado estructurado']);
+  assert.deepEqual([...new Set(ejemplos.map(e => e.tipoServicio))].sort(), ['Aire Acondicionado', 'Cableado estructurado']);
   for (const e of ejemplos) {
     assert.ok(esReferenciaDeEjemplo(e.referencia));
     assert.ok(e.fecha < hoy.toISOString(), 'cerrado en el pasado');
@@ -57,9 +57,9 @@ test('se cargan una sola vez: repetir el script no duplica nada', async () => {
   assert.equal(filas.length, 5);
 });
 
-test('con los ejemplos, Aire Condicionado ya tiene sugerencia análoga y Cableado estructurado todavía no', async () => {
+test('con los ejemplos, Aire Acondicionado ya tiene sugerencia análoga y Cableado estructurado todavía no', async () => {
   const casos = await getCasos();
-  const aire = calcularAnaloga(casos, { tipoServicio: 'Aire Condicionado', destino: 'GENERAL', minCasos: 3 });
+  const aire = calcularAnaloga(casos, { tipoServicio: 'Aire Acondicionado', destino: 'GENERAL', minCasos: 3 });
   assert.equal(aire.n, 3);
   assert.equal(aire.sugerible, true);
   assert.ok(sugerir(aire, { costoParametrico: 3000, ventaSoles: 4800 }).costo > 0);

@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { leerFilas, detectarSeparador, leerNumero, leerFecha, leerHistorico, aFilaResumen } = require('../services/historico');
 
-const TIPOS = ['Aire Condicionado', 'Cableado estructurado'];
+const TIPOS = ['Aire Acondicionado', 'Cableado estructurado'];
 
 test('detectarSeparador: el que más aparece en el encabezado', () => {
   assert.equal(detectarSeparador('a;b;c\n1;2;3'), ';');
@@ -35,7 +35,7 @@ test('leerFecha: ISO y dd/mm/aaaa, solo fechas reales', () => {
 
 const CSV = [
   'Referencia;Tipo de servicio;Destino;Fecha de cierre;Venta sin IGV;Costo real;Costo estimado;Imprevistos',
-  'Oficina Miraflores;aire condicionado;;14/03/2025;4800;3600,50;3000;360',
+  'Oficina Miraflores;aire acondicionado;;14/03/2025;4800;3600,50;3000;360',
   'Local Arequipa;Cableado Estructurado;Arequipa;2025-05-02;"2.500,00";1800;;',
 ].join('\n');
 
@@ -44,7 +44,7 @@ test('leerHistorico: lee las filas, normaliza el tipo y el destino y reconoce la
   assert.deepEqual(errores, []);
   assert.equal(filas.length, 2);
   assert.deepEqual(filas[0], {
-    linea: 2, referencia: 'Oficina Miraflores', tipoServicio: 'Aire Condicionado', destino: 'GENERAL', fecha: '2025-03-14',
+    linea: 2, referencia: 'Oficina Miraflores', tipoServicio: 'Aire Acondicionado', destino: 'GENERAL', fecha: '2025-03-14',
     ventaSoles: 4800, costoReal: 3600.5, costoEstimado: 3000, imprevistos: 360,
   });
   assert.equal(filas[1].tipoServicio, 'Cableado estructurado'); assert.equal(filas[1].destino, 'Arequipa');
@@ -54,14 +54,14 @@ test('leerHistorico: lee las filas, normaliza el tipo y el destino y reconoce la
 test('leerHistorico: cada fila mala se reporta con su línea y no se pierde el resto de los errores', () => {
   const malo = [
     'referencia,tipoServicio,fechaCierre,ventaSinIGV,costoReal,imprevistos',
-    ',Aire Condicionado,2025-03-14,4800,3000,',
+    ',Aire Acondicionado,2025-03-14,4800,3000,',
     'A,Impresoras,2025-03-14,4800,3000,',
-    'B,Aire Condicionado,31/04/2025,4800,3000,',
-    'C,Aire Condicionado,2025-03-14,0,3000,',
-    'D,Aire Condicionado,2025-03-14,4800,-5,',
-    'E,Aire Condicionado,2025-03-14,4800,3000,4000',
-    'F,Aire Condicionado,2025-03-14,4800,3000,100',
-    'f,Aire Condicionado,2025-03-14,4800,3000,100',
+    'B,Aire Acondicionado,31/04/2025,4800,3000,',
+    'C,Aire Acondicionado,2025-03-14,0,3000,',
+    'D,Aire Acondicionado,2025-03-14,4800,-5,',
+    'E,Aire Acondicionado,2025-03-14,4800,3000,4000',
+    'F,Aire Acondicionado,2025-03-14,4800,3000,100',
+    'f,Aire Acondicionado,2025-03-14,4800,3000,100',
   ].join('\n');
   const { filas, errores } = leerHistorico(malo, { tiposValidos: TIPOS });
   assert.deepEqual(filas.map(f => f.referencia), ['F']);
@@ -78,7 +78,7 @@ test('leerHistorico: cada fila mala se reporta con su línea y no se pierde el r
 
 test('leerHistorico: la fila de ejemplo de la plantilla no se carga por descuido', () => {
   const { filas, errores } = leerHistorico(
-    'referencia;tipoServicio;fechaCierre;ventaSinIGV;costoReal\nEJEMPLO (borra esta fila);Aire Condicionado;14/03/2025;4800;3600',
+    'referencia;tipoServicio;fechaCierre;ventaSinIGV;costoReal\nEJEMPLO (borra esta fila);Aire Acondicionado;14/03/2025;4800;3600',
     { tiposValidos: TIPOS }
   );
   assert.deepEqual(filas, []);

@@ -7,13 +7,13 @@
 const PREFIJO_REFERENCIA = 'Servicio de ejemplo';
 const MARCA = 'Servicios de ejemplo';
 
-// Tres de Aire Condicionado (alcanzan el mínimo de 3 servicios similares) y dos de Cableado estructurado (con el mínimo por
+// Tres de Aire Acondicionado (alcanzan el mínimo de 3 servicios similares) y dos de Cableado estructurado (con el mínimo por
 // defecto todavía muestran «sin datos suficientes»: sirven para ver los dos casos). Cada servicio salió algo distinto de lo
 // estimado: uno costó más de lo previsto, otro casi lo previsto y otro menos.
 const SERVICIOS = [
-  { tipoServicio: 'Aire Condicionado', destino: 'GENERAL', mesesAtras: 5, ventaSoles: 4800, costoEstimado: 3000, costoReal: 3600, imprevistos: 360 },
-  { tipoServicio: 'Aire Condicionado', destino: 'GENERAL', mesesAtras: 4, ventaSoles: 5200, costoEstimado: 3400, costoReal: 3550, imprevistos: 150 },
-  { tipoServicio: 'Aire Condicionado', destino: 'GENERAL', mesesAtras: 2, ventaSoles: 3900, costoEstimado: 2700, costoReal: 2650, imprevistos: 0 },
+  { tipoServicio: 'Aire Acondicionado', destino: 'GENERAL', mesesAtras: 5, ventaSoles: 4800, costoEstimado: 3000, costoReal: 3600, imprevistos: 360 },
+  { tipoServicio: 'Aire Acondicionado', destino: 'GENERAL', mesesAtras: 4, ventaSoles: 5200, costoEstimado: 3400, costoReal: 3550, imprevistos: 150 },
+  { tipoServicio: 'Aire Acondicionado', destino: 'GENERAL', mesesAtras: 2, ventaSoles: 3900, costoEstimado: 2700, costoReal: 2650, imprevistos: 0 },
   { tipoServicio: 'Cableado estructurado', destino: 'GENERAL', mesesAtras: 3, ventaSoles: 7500, costoEstimado: 5200, costoReal: 5900, imprevistos: 420 },
   { tipoServicio: 'Cableado estructurado', destino: 'GENERAL', mesesAtras: 1, ventaSoles: 6200, costoEstimado: 4300, costoReal: 4150, imprevistos: 0 },
 ];

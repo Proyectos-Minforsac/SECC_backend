@@ -16,8 +16,17 @@ const {
 const ESTADOS_QUE_ADMITEN_OFERTAS = ['PENDIENTE', 'CON OFERTAS'];
 
 // Son los mismos servicios que ofrecen los técnicos (campo "servicio" de la hoja tecnicos), para poder
-// enviar la solicitud solo a quienes lo prestan. Para agregar un tipo basta con sumarlo aquí y en el frontend.
-const TIPOS_SERVICIO = ['Aire Condicionado', 'Cableado estructurado'];
+// enviar la solicitud solo a quienes lo prestan. Para agregar un tipo basta con sumarlo aquí y en el frontend
+// (SECC_frontend/src/services/solicitudes.ts); el selector de servicio de Técnicos usa esa misma lista.
+const TIPOS_SERVICIO = [
+  'Aire Acondicionado',
+  'Cableado estructurado',
+  'Redes y datos',
+  'Instalaciones eléctricas',
+  'Puesta a tierra',
+  'Ingeniería y planos',
+  'Obras civiles y adecuaciones',
+];
 
 // Estructura en Drive, bajo la carpeta raíz del sistema:
 //   Solicitudes de Servicio/Solicitud N° X - Cliente/   ofertas de los técnicos (temporal)

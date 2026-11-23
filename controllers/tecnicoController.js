@@ -4,7 +4,7 @@ const { tieneMaximoDosDecimales } = require('../services/hojasUtils');
 // Valida y normaliza los precios de aire. Devuelve { error } o { precios }.
 // Un precio en 0 no se registra: solo se conservan los mayores a 0.
 function normalizarPreciosAire(servicio, precios) {
-  if (servicio !== 'Aire Condicionado') {
+  if (servicio !== 'Aire Acondicionado') {
     return { precios: [] };
   }
 
@@ -14,10 +14,10 @@ function normalizarPreciosAire(servicio, precios) {
     p => !p.tipoAire || Number.isNaN(Number(p.precio)) || Number(p.precio) < 0
   );
   if (invalido) {
-    return { error: 'Los precios de aire condicionado no son válidos' };
+    return { error: 'Los precios de aire acondicionado no son válidos' };
   }
   if (entrada.some(p => !tieneMaximoDosDecimales(Number(p.precio)))) {
-    return { error: 'Los precios de aire condicionado solo pueden tener hasta 2 decimales' };
+    return { error: 'Los precios de aire acondicionado solo pueden tener hasta 2 decimales' };
   }
 
   const normalizados = entrada
@@ -25,7 +25,7 @@ function normalizarPreciosAire(servicio, precios) {
     .filter(p => p.precio > 0);
 
   if (normalizados.length === 0) {
-    return { error: 'Debe indicar al menos un precio de aire condicionado mayor a 0' };
+    return { error: 'Debe indicar al menos un precio de aire acondicionado mayor a 0' };
   }
 
   return { precios: normalizados };

@@ -133,7 +133,7 @@ require.cache[ruta('models/solicitudModel.js')] = {
 };
 const { subirEvidencia, quitarEvidencia, getArchivo } = require('../models/evidenciaModel');
 
-const CARLOS = { usuarioId: 3, nombre: 'Carlos Ramírez', rol: 'tecnico' };
+const CARLOS = { usuarioId: 3, nombre: 'cramirez', nombreCompleto: 'Carlos Ramírez', rol: 'tecnico' };
 const pdf = extra => ({ nombre: 'acta.pdf', tipo: 'application/pdf', contenidoBase64: b64(PDF), ...extra });
 
 test('el técnico sube una evidencia del diagnóstico: va a Drive (Evidencias/Diagnóstico) y se registra', async () => {
@@ -146,7 +146,7 @@ test('el técnico sube una evidencia del diagnóstico: va a Drive (Evidencias/Di
   assert.equal(subidas.at(-1), 'servicio-7/Evidencias/Diagnóstico::1 - acta.pdf');
   const fila = evidencias.filas[0];
   assert.equal(fila.get('ambito'), 'DIAGNOSTICO');
-  assert.equal(fila.get('subidoPor'), 'Carlos Ramírez');
+  assert.equal(fila.get('subidoPor'), 'cramirez');
   assert.equal(fila.get('archivoId'), 'drive-1');
   assert.deepEqual(await getArchivo(1), { archivoId: 'drive-1', nombre: 'acta.pdf', tipo: 'application/pdf' });
 });

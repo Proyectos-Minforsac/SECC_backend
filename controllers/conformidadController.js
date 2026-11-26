@@ -51,7 +51,7 @@ async function enviarConformidad(req, res) {
       from: remitente,
       to: correoDestino,
       replyTo: process.env.MAIL_REPLY_TO || remitente,
-      subject: `Documento de conformidad - ${nombreVisita} - Multiservicios Informáticos S.A.C`,
+      subject: `Documento de conformidad - ${nombreVisita} - Multiservicios Info8rmáticos S.A.C`,
       text:
         `Estimado cliente ${clienteNombre}:\n\n` +
         `Adjuntamos el documento de conformidad de la visita realizada (${nombreVisita}). ` +

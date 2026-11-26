@@ -25,25 +25,34 @@ function normalizarRol(rol) {
   return null;
 }
 
-// Busca en la hoja "usuarios" una fila cuyo nombre y contraseña coincidan.
-// El nombre no distingue mayúsculas/minúsculas; la contraseña sí.
-async function buscarUsuario(nombre, contrasena) {
+// Los datos de la persona que ya se identificó. Nunca incluye la contraseña.
+//   nombre          el nombre de usuario (con el que inicia sesión); es el que queda registrado en el Excel como autor
+//   nombreCompleto  lo que se muestra en pantalla. En un técnico debe ser igual a su `nombre` en la hoja tecnicos: así se
+//                   le reconoce en las solicitudes, visitas, evidencias y avisos. Si falta, vale el nombre de usuario
+function datosDeUsuario(fila, rol) {
+  const nombreUsuario = String(fila.get('nombreUsuario') || '').trim();
+  return {
+    usuarioId: Number(fila.get('usuarioId')),
+    nombre: nombreUsuario,
+    nombreCompleto: String(fila.get('nombreCompleto') || '').trim() || nombreUsuario,
+    rol,
+  };
+}
+
+// Busca en la hoja "usuarios" una fila cuyo nombre de usuario y contraseña coincidan.
+// El nombre de usuario no distingue mayúsculas/minúsculas; la contraseña sí.
+async function buscarUsuario(nombreUsuario, contrasena) {
   const filas = await cargarFilas();
-  const nombreBuscado = String(nombre).trim().toLowerCase();
+  const nombreBuscado = String(nombreUsuario).trim().toLowerCase();
 
   const fila = filas.find(f =>
-    String(f.get('nombre') || '').trim().toLowerCase() === nombreBuscado &&
+    String(f.get('nombreUsuario') || '').trim().toLowerCase() === nombreBuscado &&
     String(f.get('contrasena') || '').trim() === String(contrasena).trim()
   );
 
   if (!fila) return null;
 
-  // Nunca se devuelve la contraseña.
-  return {
-    usuarioId: Number(fila.get('usuarioId')),
-    nombre: String(fila.get('nombre')).trim(),
-    rol: String(fila.get('rol')).trim(),
-  };
+  return datosDeUsuario(fila, String(fila.get('rol')).trim());
 }
 
 // Para identificar a quien hace una petición. El rol ya viene normalizado (null si no se reconoce).
@@ -53,11 +62,7 @@ async function buscarUsuarioPorId(usuarioId) {
 
   if (!fila) return null;
 
-  return {
-    usuarioId: Number(fila.get('usuarioId')),
-    nombre: String(fila.get('nombre')).trim(),
-    rol: normalizarRol(fila.get('rol')),
-  };
+  return datosDeUsuario(fila, normalizarRol(fila.get('rol')));
 }
 
 module.exports = { buscarUsuario, buscarUsuarioPorId, normalizarRol };

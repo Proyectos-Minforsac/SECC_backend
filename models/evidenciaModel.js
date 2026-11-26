@@ -47,7 +47,8 @@ function resolverDestino(datos, { visitaId, visitaProgramadaId }, usuario) {
 
   if (usuario?.rol === 'tecnico') {
     const tecnico = datos.filas.tecnicos.find(f => mismoId(f.get('tecnicoId'), visita.get('tecnicoId')));
-    if (!tecnico || normalizar(tecnico.get('nombre')) !== normalizar(usuario.nombre)) {
+    // La hoja de técnicos guarda el nombre completo, no el nombre de usuario
+    if (!tecnico || normalizar(tecnico.get('nombre')) !== normalizar(usuario.nombreCompleto)) {
       throw errorHttp(403, 'Este servicio no está asignado a tu usuario');
     }
   }
